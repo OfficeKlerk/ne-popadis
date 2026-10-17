@@ -79,6 +79,25 @@
       <div class="decisions" id="end-decisions"></div>
       <div class="end-verdict" id="end-verdict"></div>
 
+      <section class="reward-panel" id="reward-panel" aria-labelledby="reward-title">
+        <p class="reward-eyebrow">Твоя награда за забег</p>
+        <h3 id="reward-title"></h3>
+        <div class="chest-art" id="chest-art" aria-hidden="true">
+          <div class="chest-sparkles">✦　✧　✦</div>
+          <div class="chest-lid"></div><div class="chest-base"></div><div class="chest-lock">★</div>
+        </div>
+        <p class="reward-caption" id="reward-caption"></p>
+        <p class="reward-odds" id="reward-odds"></p>
+        <button class="btn-primary reward-open" id="btn-open-chest">Открыть сундук</button>
+        <div class="reward-reel hidden" id="reward-reel" aria-hidden="true">
+          <div class="reel-pointer"></div>
+          <div class="reel-window"><div class="reel-track" id="reel-track"></div></div>
+          <p class="reel-label">Твоя зверушка — под стрелкой</p>
+        </div>
+        <div id="reward-pet" class="hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+        <p class="reward-guide">0–9 монет · деревянный<br>10–24 · серебряный / 25+ · золотой</p>
+      </section>
+
       <div class="review" id="review">
         <p class="review-title hidden" id="review-title">Разбор ошибок — нажми, чтобы понять:</p>
         <div id="review-list"></div>
@@ -98,6 +117,7 @@
     </section>
   </div>
 
+  <script src="js/rewards.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

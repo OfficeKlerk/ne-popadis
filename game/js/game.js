@@ -65,6 +65,7 @@
   var flashTimer = 0;
   var ending = false, endTimer = 0;
   var attractT = 1, tAnim = 0;
+  var runChest = null, runPet = null, rewardTimer = null;
 
   // «Сочность»
   var REDUCED = false;
@@ -185,6 +186,9 @@
 
   // ---------- Старт забега ----------
   function startRun() {
+    clearTimeout(rewardTimer); rewardTimer = null;
+    resetRewardReel();
+    runChest = null; runPet = null;
     player.lane = 1; player.x = laneX(1); player.targetX = player.x; player.bob = 0;
     cards = []; speed = diff.startSpeed; elapsed = 0; spawnTimer = 0.9;
     meters = 0; coins = 0; combo = 0; bestCombo = 0; lives = diff.lives;
@@ -434,6 +438,7 @@
     countTo("end-distance", Math.round(meters), "", 0.25);
     countTo("end-recognized", trapsOK, "/" + trapsTotal, 0.45);
     countTo("end-coins", coins, "", 0.65);
+    prepareReward();
     $("end-decisions").textContent = "Верных решений: " + decisionsOK + " из " + decisionsTotal;
 
     var pct = trapsTotal ? trapsOK / trapsTotal : 1;
@@ -466,6 +471,92 @@
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+
+  function prepareReward() {
+    clearTimeout(rewardTimer); rewardTimer = null;
+    resetRewardReel();
+    runChest = window.RunRewards.chestFor(coins);
+    runPet = null;
+    $("reward-panel").dataset.chest = runChest.id;
+    $("reward-title").textContent = runChest.name;
+    $("reward-caption").textContent = "Собрано монет: " + coins + ". Внутри — одна зверушка!";
+    $("reward-odds").textContent = runChest.odds.map(function (entry) {
+      return window.RunRewards.rarities[entry.rarity].name + " — " + entry.chance + "%";
+    }).join(" · ");
+    $("chest-art").classList.remove("hidden");
+    $("btn-open-chest").classList.remove("hidden");
+    $("btn-open-chest").disabled = false;
+    $("btn-open-chest").textContent = "Открыть сундук";
+    $("reward-pet").classList.add("hidden");
+    $("reward-pet").innerHTML = "";
+    $("screen-end").scrollTop = 0;
+  }
+
+  function openReward() {
+    if (state !== "end" || !runChest || runPet) return;
+    runPet = window.RunRewards.roll(runChest);
+    $("btn-open-chest").disabled = true;
+    $("btn-open-chest").textContent = "Открываем…";
+    $("reward-caption").textContent = "Кто станет твоим новым другом?";
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    Sound.ensure(); Sound.swish();
+    if (reduceMotion) revealReward();
+    else spinRewardReel();
+  }
+
+  function resetRewardReel() {
+    $("reward-reel").classList.add("hidden");
+    $("reward-reel").classList.remove("spinning", "settled");
+    $("reel-track").innerHTML = "";
+  }
+
+  function spinRewardReel() {
+    var track = $("reel-track"), reel = $("reward-reel");
+    var winnerIndex = 28;
+    var markup = "";
+    for (var i = 0; i < 32; i++) {
+      // Результат уже выбран. Остальная лента — визуализация того же сундука.
+      var pet = i === winnerIndex ? runPet : window.RunRewards.roll(runChest);
+      var rarity = window.RunRewards.rarities[pet.rarity];
+      markup += '<div class="reel-card" style="--card-color:' + rarity.color + '">' +
+        window.RunRewards.art(pet) + '<span class="reel-name">' + pet.name + '</span>' +
+        '<span class="reel-rarity">' + rarity.name + '</span></div>';
+    }
+    track.innerHTML = markup;
+    $("chest-art").classList.add("hidden");
+    reel.classList.remove("hidden");
+    // Лента начинается от центра окна. Смещение не зависит от ширины телефона.
+    var winner = track.children[winnerIndex];
+    track.style.setProperty("--reel-start", -(track.children[0].offsetWidth / 2) + "px");
+    track.style.setProperty("--reel-end", -(winner.offsetLeft + winner.offsetWidth / 2) + "px");
+    reel.classList.add("spinning");
+    rewardTimer = setTimeout(function () {
+      if (state !== "end" || !runPet) return;
+      reel.classList.add("settled");
+      reel.classList.remove("spinning");
+      winner.classList.add("winner");
+      $("reward-caption").textContent = "Твоя зверушка — " + runPet.name + "!";
+      rewardTimer = setTimeout(revealReward, 500);
+    }, 3900);
+  }
+
+  function revealReward() {
+    rewardTimer = null;
+    if (state !== "end" || !runPet) return;
+    var rarity = window.RunRewards.rarities[runPet.rarity];
+    $("btn-open-chest").classList.add("hidden");
+    $("chest-art").classList.add("hidden");
+    $("reward-caption").textContent = "Твой новый друг!";
+    var petEl = $("reward-pet");
+    petEl.style.setProperty("--pet-color", rarity.color);
+    petEl.innerHTML = '<div class="pet-art">' + window.RunRewards.art(runPet) + '</div>' +
+      '<span class="pet-rarity">' + rarity.name + '</span><h4 class="pet-name">' + runPet.name + '</h4>' +
+      '<p class="pet-bio">' + runPet.bio + '</p>' +
+      '<div class="pet-lesson"><p class="pet-skill">' + runPet.skill + '</p>' +
+      '<p class="pet-tip">' + runPet.tip + '</p></div>';
+    petEl.classList.remove("hidden");
+    Sound.ensure(); Sound.combo(); Bridge.vibrate(35);
+  }
 
   // ---------- Обновление ----------
   var lastDist = -1, lastCoins = -1;
@@ -924,6 +1015,7 @@
 
   // ---------- Кнопки / UI ----------
   function setupUI() {
+    $("btn-open-chest").addEventListener("click", openReward);
     $("btn-play").addEventListener("click", function () { Sound.ensure(); startRun(); });
     $("btn-again").addEventListener("click", function () { startRun(); });
     $("btn-share").addEventListener("click", function () {
