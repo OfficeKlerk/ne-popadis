@@ -65,6 +65,7 @@
   var cityCheer = 0, roadCoins = 0, roadObjects = [];
   var meters = 0, coins = 0, combo = 0, bestCombo = 0, lives = 3;
   var trapsTotal = 0, trapsOK = 0, decisionsTotal = 0, decisionsOK = 0;
+  var misses = [];                // ошибочные решения для разбора на финише
   var lastSituation = null;
   var flashTimer = 0;
   var ending = false, endTimer = 0;
@@ -113,7 +114,8 @@
   }
 
   function makeTown(w, h, seed, blur, scale) {
-    var c = document.createElement("canvas"); c.width = Math.round(w * DPR); c.height = Math.round(h * DPR);
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w * DPR)); c.height = Math.max(1, Math.round(h * DPR));
     var g = c.getContext("2d"); g.scale(DPR, DPR);
     var s = seed;
     function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
@@ -169,6 +171,10 @@
   function resize() {
     var app = $("app");
     W = app.clientWidth; H = app.clientHeight;
+    // Фолбэк: в скрытой вкладке / 0-размерном контейнере не даём нулевые размеры,
+    // иначе offscreen-canvas получается 0×0 и drawImage падает (краш инициализации).
+    if (W < 50) W = window.innerWidth || 360;
+    if (H < 50) H = window.innerHeight || 640;
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     cv.style.width = W + "px"; cv.style.height = H + "px";
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -260,6 +266,7 @@
     course.begin(round, diff.runSeconds || 10, diff.runSpeedMultiplier || 1.5);
     meters = 0; coins = 0; combo = 0; bestCombo = 0; lives = diff.lives;
     trapsTotal = 0; trapsOK = 0; decisionsTotal = 0; decisionsOK = 0;
+    misses = [];
     lastSituation = null; flashTimer = 0; ending = false; endTimer = 0;
     clearFx(); shakeT = 0; vignetteT = 0; squashT = 0; hopT = 0; hurtT = 0; feverGlow = 0;
     laneFlash[0] = laneFlash[1] = laneFlash[2] = 0; laneHint[0] = laneHint[1] = laneHint[2] = 0;
@@ -559,6 +566,7 @@
       updateCombo(true);
     } else {
       var hadCombo = combo > 0;
+      misses.push({ icon: c.icon, text: c.text, why: c.why, answer: c.answer, isTrap: c.isTrap });
       combo = 0; updateCombo(false);
       lives--; renderLives(lives);
       Bridge.vibrate(70); Sound.bad();
@@ -632,13 +640,14 @@
     counters = [];
     countTo("end-distance", Math.round(meters), "", 0.1);
     countTo("end-coins", coins, "", 0.2);
-    countTo("end-recognized", trapsOK, "", 0.3);
+    $("end-recognized").textContent = trapsOK + "/" + trapsTotal;
     var pct = decisionsTotal ? decisionsOK / decisionsTotal : 0;
     var verdict = !decisionsTotal ? "Каждый забег — новая попытка. У тебя получится!" :
       pct >= .9 ? "Отличная внимательность! Продолжай в том же духе." :
       pct >= .6 ? "Хороший забег! Продолжай замечать ловушки." :
       "С каждым забегом ты внимательнее. Попробуй ещё!";
     $("end-verdict").textContent = verdict;
+    renderReview();
     rewardShop.start(coins);
 
     Bridge.finish({ meters: Math.round(meters), coins: coins, trapsOK: trapsOK, trapsTotal: trapsTotal, bestCombo: bestCombo });
@@ -646,6 +655,31 @@
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+
+  // ---------- Разбор ошибок на финише («почему») ----------
+  function renderReview() {
+    var el = $("end-review");
+    if (!el) return;
+    var seen = {}, uniq = [];
+    for (var i = 0; i < misses.length; i++) { var m = misses[i]; if (seen[m.text]) continue; seen[m.text] = 1; uniq.push(m); }
+    if (!uniq.length) {
+      el.innerHTML = '<p class="review-allgood">🎉 Ни одной ошибки — ты раскусил все ловушки!</p>';
+      return;
+    }
+    var html = '<p class="review-title">Разбор — нажми, чтобы понять:</p>';
+    for (var r = 0; r < Math.min(5, uniq.length); r++) {
+      var u = uniq[r], act = actionById[u.answer] || {};
+      var tag = u.isTrap ? '' : '<span class="review-safe">это было безопасно</span>';
+      html += '<button class="review-item" type="button">' +
+        '<span class="ri-top">' + u.icon + ' <span class="ri-text">' + escapeHtml(u.text) + '</span>' + tag + '</span>' +
+        '<span class="ri-why">' + escapeHtml(u.why) +
+        ' <b>Верно: ' + (act.emoji || '') + ' ' + escapeHtml(act.label || '') + '</b></span>' +
+        '</button>';
+    }
+    el.innerHTML = html;
+    var items = el.querySelectorAll('.review-item');
+    for (var k = 0; k < items.length; k++) items[k].addEventListener('click', function () { this.classList.toggle('open'); });
+  }
 
   // ---------- Обновление ----------
   var lastDist = -1, lastCoins = -1;
@@ -1200,7 +1234,11 @@
 
   // ---------- Инициализация ----------
   window.addEventListener("resize", resize);
-  resize();
+  // Пересобирать раскладку, когда контейнер получает реальный размер (скрытая вкладка/превью → видимый).
+  try {
+    if (window.ResizeObserver) { new ResizeObserver(function () { resize(); }).observe($("app")); }
+  } catch (e) {}
+  try { resize(); } catch (e) { /* не даём краху раскладки оборвать инициализацию */ }
   setupInput();
   setupUI();
   loadContent();

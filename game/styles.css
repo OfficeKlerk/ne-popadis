@@ -374,3 +374,23 @@ button { font-family: inherit; }
 #event-stage.event-stage { top:calc(env(safe-area-inset-top) + 96px); }
 #app.is-paused .hud *,#app.is-paused .event-stage * { animation-play-state:paused!important; }
 @media(max-width:360px) { .hud-chip { font-size:13px; }.hud-health .life { width:17px; height:21px; } }
+
+/* ---------- Разбор ошибок на финише ---------- */
+.end-review { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 7px; animation: riseIn 0.4s ease-out 0.55s both; }
+.review-title { margin: 2px 0 1px; font-size: 13px; font-weight: 800; color: var(--ink-2); }
+.review-allgood { margin: 0; font-size: 14.5px; font-weight: 800; color: var(--ok-d); background: #e6fff2; border: 2px solid #b6f0d2; border-radius: 14px; padding: 10px 12px; }
+.review-item { display: block; width: 100%; text-align: left; background: var(--tile); border: 2px solid #ffd7df; border-left: 5px solid var(--refuse); border-radius: 14px; padding: 9px 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(35,36,106,0.08); font: inherit; }
+.review-item .ri-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; font-weight: 800; color: var(--ink); }
+.review-item .ri-text { flex: 1; min-width: 0; }
+.review-safe { font-size: 10.5px; font-weight: 800; color: #9a6b00; background: #fff0c7; border-radius: 999px; padding: 2px 8px; }
+.review-item .ri-why { display: none; margin-top: 7px; font-size: 13px; line-height: 1.38; color: var(--ink-2); }
+.review-item .ri-why b { color: var(--ok-d); font-weight: 900; }
+.review-item.open { border-color: #cfe9d8; border-left-color: var(--ok); }
+.review-item.open .ri-why { display: block; }
+
+/* Кнопка «Играть»: приглашающий пульс затухает (не дёргается бесконечно) */
+#btn-play { animation: riseIn 0.4s ease-out 0.55s both, pulse 1.6s ease-in-out 1s 4; }
+@media (prefers-reduced-motion: reduce) {
+  #btn-play { animation: riseIn 0.4s ease-out 0.55s both; }
+  .badge, .end-review { animation: none; }
+}
