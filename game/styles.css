@@ -403,3 +403,38 @@ button { font-family: inherit; }
 .chase.hit { animation: chipPop 0.35s ease-out; }
 @keyframes dangerPulse { 0%,100% { box-shadow: var(--card-sh); } 50% { box-shadow: 0 4px 0 rgba(212,42,76,0.4), 0 0 0 4px rgba(255,77,109,0.35); } }
 .howto-foot { margin: 10px 2px 0; padding-top: 9px; border-top: 2px dashed #e2e8f6; font-size: 13px; font-weight: 800; color: var(--ink); }
+
+/* ---------- Тост ачивки ---------- */
+.toast {
+  position: absolute; left: 50%; top: calc(env(safe-area-inset-top) + 64px); z-index: 9;
+  transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  max-width: calc(100% - 32px); padding: 10px 16px 10px 12px; border-radius: 18px;
+  background: linear-gradient(180deg, #fff6c4, var(--sun)); color: var(--ink);
+  box-shadow: 0 5px 0 #d99a00, 0 12px 24px rgba(217,154,0,0.35);
+  font-size: 14.5px; font-weight: 800; white-space: nowrap;
+  animation: toastIn 0.45s cubic-bezier(.2,1.5,.4,1);
+}
+.toast .t-emoji { font-size: 26px; }
+.toast b { color: var(--violet-2); margin-right: 4px; }
+@keyframes toastIn { from { transform: translate(-50%, -30px) scale(0.7); opacity: 0; } to { transform: translate(-50%, 0) scale(1); opacity: 1; } }
+
+/* ---------- Итог: стикеры жуликов, ачивки, «Подробнее» ---------- */
+.villain { position: relative; }
+.villain .v-name { line-height: 1.12; min-height: 26px; }
+.villain.caught { background: #fff; box-shadow: 0 3px 0 rgba(35,36,106,0.12); border: 3px solid var(--vc); transform: rotate(-3deg); }
+.villain.caught:nth-child(even) { transform: rotate(3deg); }
+.villain.caught .v-state { color: #fff; background: var(--vc); border-radius: 999px; padding: 0 6px; display: inline-block; font-weight: 900; }
+.villain.escaped { background: #f1f4fb; box-shadow: none; opacity: 0.85; }
+.villain.escaped .v-emoji { filter: grayscale(0.6); }
+.villain.unmet { background: #f1f4fb; box-shadow: none; }
+.end-ach { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 360px; }
+.ach-chip { background: linear-gradient(180deg, #fff6c4, #ffe066); color: var(--ink); font-size: 12.5px; font-weight: 900; padding: 6px 10px; border-radius: 999px; box-shadow: 0 3px 0 #e0b000; }
+.more { width: 100%; max-width: 360px; }
+.more summary { list-style: none; cursor: pointer; font-size: 14px; font-weight: 900; color: var(--ink-2); padding: 8px; text-decoration: underline; text-underline-offset: 3px; }
+.more summary::-webkit-details-marker { display: none; }
+.more[open] { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.end-verdict { min-height: 0; }
+.end-title { font-size: 34px; }
+#distance { display: none; }
+.hud-chip { white-space: nowrap; }
+.villain .v-name { font-size: 10.5px; overflow-wrap: anywhere; }

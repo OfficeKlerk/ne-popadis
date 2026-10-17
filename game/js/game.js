@@ -36,7 +36,11 @@
     bad: function () { this.blip(180, 0.22, "square"); },
     coin: function () { this.blip(990, 0.08, "triangle"); },
     combo: function () { var s = this; [660, 880, 1100, 1320].forEach(function (f, i) { setTimeout(function () { s.blip(f, 0.12, "triangle"); }, i * 70); }); },
-    swish: function () { this.blip(420, 0.05, "sine"); }
+    swish: function () { this.blip(420, 0.05, "sine"); },
+    bonk: function () { this.blip(140, 0.16, "triangle"); var s = this; setTimeout(function () { s.blip(90, 0.2, "square"); }, 60); },
+    laugh: function () { var s = this; [520, 460, 520, 460].forEach(function (f, i) { setTimeout(function () { s.blip(f, 0.07, "square"); }, i * 90); }); },
+    drama: function () { var s = this; [220, 208, 185].forEach(function (f, i) { setTimeout(function () { s.blip(f, i === 2 ? 0.5 : 0.22, "sawtooth"); }, i * 260); }); },
+    fanfare: function () { var s = this; [784, 988, 1175, 1568].forEach(function (f, i) { setTimeout(function () { s.blip(f, 0.1, "triangle"); }, i * 80); }); }
   };
 
   // ---------- Утилиты ----------
@@ -78,7 +82,13 @@
   // Замедление на решении: мир идёт медленнее, пока ребёнок читает карточку
   var timeScale = 1, slowVis = 0, slowHintShown = false;
   // Погоня: 1 — жулик далеко, 0 — догнал
-  var chase = 1, chaseVis = 1, villainX = 0, villainKnock = 0, caught = false, lastChaseKey = -1;
+  var chase = 1, chaseVis = 1, villainX = 0, villainKnock = 0, caught = false, lastChaseKey = -1, chasePat = "codethief";
+  // Персонажи-жулики, реплики, ачивки, драматичный зум, босс
+  var actors = [], pops = [], whineIdx = {};
+  var achById = {}, achEarned = [], achQueue = [], toastT = 0, dodged = 0;
+  var dramaT = 0;
+  var cardsSpawned = 0, bossPhase = 0, bossIdx = 0, bossHits = 0, bossT = 0, bossHitT = 0, bossGone = false, finished = false;
+  var BUB_H = 108, PH_H = 46;
   var trapsTotal = 0, trapsOK = 0, decisionsTotal = 0, decisionsOK = 0;
   var misses = [];                // {icon,text,why}
   var lastSituation = null;
@@ -103,7 +113,10 @@
 
   // ---------- Геометрия псевдо-перспективы ----------
   // Глубина p: 0 — горизонт, 1 — линия решения (позиция героя). Масштаб r(p) = 1 / (1 + (1-p)K).
-  var RT = 0.34;                  // масштаб дороги на горизонте
+  // Камера низко за спиной героя: сильная перспектива, герой крупный и у нижнего края
+  var RT = 0.22;                  // масштаб дороги на горизонте (меньше — сильнее перспектива)
+  var HS = 1.45;                  // масштаб героя («камера ближе к спине»)
+  var DMAX = 1 + 0.6 / (1 / RT - 1); // предел глубины за линией героя (иначе перспектива «выворачивается»)
   var KP = 1 / RT - 1;
   var hy = 0, y0 = 0, pY = 0, rB = 1;
   var skyGrad, groundGrad, roadGrad;
@@ -192,7 +205,7 @@
   }
 
   function layout() {
-    pY = Math.min(H * 0.80, H - 196); hy = H * 0.22;
+    pY = Math.min(H * 0.82, H - 182); hy = H * 0.19;
     y0 = (hy - RT * pY) / (1 - RT);
     rB = (H - y0) / (pY - y0);
     skyGrad = ctx.createLinearGradient(0, 0, 0, hy);
@@ -236,6 +249,8 @@
   function applyContent(data) {
     (data.actions || []).forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
     (data.patterns || []).forEach(function (p) { patternById[p.id] = p; });
+    if (data.boss) patternById.boss = data.boss;
+    (data.achievements || []).forEach(function (a) { achById[a.id] = a; });
   }
 
   // ---------- Экраны ----------
@@ -265,7 +280,10 @@
     lastDist = -1; lastCoins = -1;
     items = []; itemTimer = 1.2; coinLine = 0; itemRng = mulberry32(runCode * 7 + 13);
     timeScale = 1; slowVis = 0; slowHintShown = false;
-    chase = 1; chaseVis = 1; villainX = laneX(1); villainKnock = 0; caught = false; lastChaseKey = -1;
+    chase = 1; chaseVis = 1; villainX = laneX(1); villainKnock = 0; caught = false; lastChaseKey = -1; chasePat = "codethief";
+    actors = []; pops = []; whineIdx = {}; achEarned = []; achQueue = []; toastT = 0; dodged = 0; dramaT = 0;
+    cardsSpawned = 0; bossPhase = 0; bossIdx = 0; bossHits = 0; bossT = 0; bossHitT = 0; bossGone = false; finished = false;
+    $("toast").classList.add("hidden");
     renderChase(false);
     updateCombo(false);
     syncLegend();
@@ -298,16 +316,20 @@
     // не повторяем ту же карточку и тот же приём подряд (кроме «безопасных»)
     while ((s === lastSituation || (lastSituation && s.pattern !== "safe" && s.pattern === lastSituation.pattern)) && guard++ < 8) s = list[(rng() * list.length) | 0];
     lastSituation = s;
+    cardsSpawned++;
+    spawnCard(s, false);
+  }
+  function spawnCard(s, isBoss) {
     var lane = actionLaneById[s.answer];
     ctx.font = "800 15.5px " + FONT;
     cards.push({
-      icon: s.icon, text: s.text, why: s.why, answer: s.answer, pattern: s.pattern, lines: wrapLines(s.text, cardW() - 16),
-      answerLane: lane, isTrap: s.answer !== "ok",
-      x: laneX(1), y: -cardH(), resolved: false, result: null, flashT: 0, removeTimer: 0, age: 0
+      icon: s.icon, text: s.text, why: s.why, answer: s.answer, pattern: isBoss ? "boss" : s.pattern, lines: wrapLines(s.text, cardW() - 16),
+      answerLane: lane, isTrap: s.answer !== "ok", drama: !!s.drama, boss: isBoss, ph: Math.random() * 6,
+      x: laneX(1), y: -cardH(), resolved: false, result: null, flashT: 0, removeTimer: 0, removeMax: 0.5, age: 0
     });
   }
   function cardW() { return Math.min(W * 0.46, 178); }
-  function cardH() { return 108; }
+  function cardH() { return BUB_H + PH_H; }   // пузырь-сообщение + телефон на ножках под ним
 
   // ---------- Ввод ----------
   function move(dir) { setLane(player.lane + dir); }
@@ -403,7 +425,7 @@
   }
   function spawnDust() {
     if (REDUCED) return;
-    var y = playerY() + 34;
+    var y = playerY() + 34 * HS;
     for (var i = 0; i < 5; i++) addParticle(player.x, y, (Math.random() - 0.5) * 90, -Math.random() * 40, 0.35, 3 + Math.random() * 3, "rgba(35,36,106,0.22)", 120);
   }
   function updateFx(dt) {
@@ -450,7 +472,15 @@
   function shake(mag) { if (REDUCED) return; shakeT = 0.3; shakeMag = mag; }
 
   // ---------- Разрешение карточки ----------
-  var PRAISE = { refuse: ["Отказ!", "Не дался!", "Стоп!"], check: ["Проверил!", "Умно!", "Сверил!"], ok: ["Верно!", "Можно!", "Точно!"] };
+  function cardScreenPos(c) {
+    var p = clamp((c.y + cardH()) / pY, 0, DMAX), r = rOf(p);
+    return { x: clamp(sxAt(c.x, r), 60, W - 60), y: yOf(r) };
+  }
+  function nextWhine(pat) {
+    var v = patternById[pat]; if (!v || !v.whines) return "Ой-ой!";
+    var i = whineIdx[pat] || 0; whineIdx[pat] = Math.min(i + 1, v.whines.length - 1);
+    return v.whines[i];   // с каждой встречей жулик ноет всё отчаяннее — а ты всё равно не ведёшься
+  }
   function resolveCard(c) {
     c.resolved = true;
     decisionsTotal++;
@@ -459,48 +489,55 @@
     c.result = correct ? "ok" : "bad";
     history.push(correct);
     if (c.pattern) { var ps = patStats[c.pattern] || (patStats[c.pattern] = { ok: 0, bad: 0 }); ps[correct ? "ok" : "bad"]++; }
-    var villain = patternById[c.pattern];
     c.flashT = 0.5;
-    c.removeTimer = 0.5;
-    var hy2 = playerY();
+    c.removeTimer = c.removeMax = correct && c.isTrap ? 0.6 : 0.5;
+    var hy2 = playerY(), pos = cardScreenPos(c);
     if (correct) {
       decisionsOK++;
       if (c.isTrap) trapsOK++;
       combo++; bestCombo = Math.max(bestCombo, combo);
-      var gain = 1 + Math.floor(combo / 3);
-      coins += gain;
+      coins += 1 + Math.floor(combo / 3);
       Bridge.vibrate(25); Sound.good();
       spawnBurst(player.x, hy2, LANE_COLORS[c.answerLane]);
-      spawnBurst(player.x, hy2 - 10, "#ffffff");
-      spawnCoins(player.x, hy2);
-      addRing(player.x, hy2 + 30, 14, 90, LANE_RGB[c.answerLane], 0.5);
       laneFlash[c.answerLane] = 0.5;
-      addFloat(player.x, hy2 - 62, pick(PRAISE[c.answer] || PRAISE.ok), "#ffffff", 22);
-      if (villain) addFloat(W / 2, H * 0.30, villain.emoji + " " + villain.name + " пойман!", "#ffc24b", 22);
-      addFloat(player.x + 34, hy2 - 30, "+" + gain, "#ffc24b", 20);
       squashT = 0.16; hopT = 0.36;
-      if (combo === 3 || (combo > 3 && combo % 4 === 0)) {
-        spawnConfetti(player.x, hy2 - 10, 26, true);
-        addFloat(W / 2, H * 0.4, "Комбо x" + (1 + Math.floor(combo / 3)) + "!", "#ffc24b", 36);
-        addRing(player.x, hy2 + 30, 20, 190, "255,194,75", 0.65);
-        Sound.combo();
-      }
-      var before = chase;
       chase = Math.min(1, chase + D("chaseRecover", 0.12)); villainKnock = 0.6; renderChase(false);
-      if (before < 0.6) addFloat(W / 2, pY + 70, "Отбился!", "#ffd23f", 20);
+      if (c.boss) {
+        bossHits++; bossHitT = 0.5;
+        addPop("boom", W * 0.72, hy + 60, "БАМ!", 0.9);
+        addPop("speech", W * 0.55, hy + 150, (content.boss.whines || [])[Math.min(bossHits - 1, 2)] || "Ой!", 1.6);
+        Sound.bonk(); shake(6);
+      } else if (c.isTrap) {
+        addActor("ko", c.pattern, pos.x, pos.y, 1);
+        addPop("speech", pos.x, pos.y - 150, nextWhine(c.pattern), 1.9);
+        if (c.pattern === "prize") unlock("prize");
+        if (c.pattern === "codethief") unlock("code");
+        var caughtAll = (content.patterns || []).every(function (pt) { return patStats[pt.id] && patStats[pt.id].ok > 0; });
+        if (caughtAll) unlock("all7");
+      } else {
+        addFloat(W / 2, H * 0.36, c.drama ? "Всё честно 👌" : "Верно!", "#ffffff", 24);
+        if (c.drama) unlock("honest");
+      }
+      if (combo === 3 || (combo > 3 && combo % 4 === 0)) { spawnConfetti(player.x, hy2 - 10, 26, true); Sound.combo(); }
+      if (combo >= 5) unlock("combo5");
+      if (coins >= 30) unlock("coins30");
       updateCombo(true);
     } else {
-      var hadCombo = combo > 0;
       combo = 0; updateCombo(false);
       chaseHit(D("chaseWrong", 0.34));
       misses.push({ icon: c.icon, text: c.text, why: c.why, isTrap: c.isTrap, answer: c.answer, pattern: c.pattern });
       Bridge.vibrate(70); Sound.bad();
       shake(10); vignetteT = 0.5; squashT = 0.22; hurtT = 0.55;
       laneHint[c.answerLane] = 1.6;
-      spawnBurst(player.x, hy2 - 30, "#ff5a5f"); spawnBurst(player.x, hy2, "#ff8a8e");
-      addFloat(player.x, hy2 - 62, hadCombo ? "Серия прервана" : "Ой!", "#ff7a92", 22);
+      if (c.boss) {
+        addPop("speech", W * 0.55, hy + 150, content.boss.laugh || "Ха-ха!", 1.6); Sound.laugh();
+      } else if (c.isTrap) {
+        var stolen = Math.min(3, coins); coins -= stolen; chasePat = c.pattern;
+        addActor("steal", c.pattern, pos.x, pos.y, 1);
+        addPop("speech", pos.x, pos.y - 150, stolen ? "Хе-хе! −" + stolen + " 🪙" : "Хе-хе!", 1.5);
+        Sound.laugh();
+      }
       showFlash(c);
-
     }
   }
 
@@ -517,7 +554,7 @@
     var el = $("flash");
     var a = actionById[c.answer] || {};
     var v = patternById[c.pattern];
-    var who = v ? '<div class="flash-villain">' + v.emoji + " Это был " + escapeHtml(v.name) + "</div>"
+    var who = v ? '<div class="flash-villain">' + v.emoji + " Это был " + escapeHtml(v.brName || v.name) + "</div>"
                 : (!c.isTrap ? '<div class="flash-villain">Тут всё было честно</div>' : "");
     el.innerHTML = '<span class="flash-icon">' + c.icon + "</span>" + who + escapeHtml(c.why) +
       '<div class="flash-ans">Верно: ' + (a.emoji || "") + " " + escapeHtml(a.label || "") + "</div>";
@@ -532,7 +569,9 @@
 
   function endRun() {
     showScreen("end");
-    $("end-title").textContent = caught ? "Жулик догнал!" : "Забег окончен!";
+    $("end-title").textContent = caught ? "Жулик догнал!" : finished ? "Финиш! 🏁" : "Забег окончен!";
+    $("more").open = false;
+    renderAchievements();
     cards = []; clearFx();
     counters = [];
     countTo("end-distance", Math.round(meters), "", 0.25);
@@ -555,7 +594,7 @@
     var uniq = {};
     var uniqueMisses = misses.filter(function (m) { if (uniq[m.text]) return false; uniq[m.text] = 1; return true; });
     $("review-title").classList.toggle("hidden", uniqueMisses.length === 0);
-    $("review-title").textContent = "Разбор ошибок (все неверные решения) — нажми, чтобы понять:";
+    $("review-title").textContent = "Разбор ошибок — нажми, чтобы понять:";
     uniqueMisses.slice(0, 5).forEach(function (m) {
       var d = document.createElement("div");
       d.className = "review-item";
@@ -583,12 +622,18 @@
       var st = patStats[p.id];
       var cls = !st ? "unmet" : st.ok > 0 ? "caught" : "escaped";
       if (cls === "caught") villainsCaught++;
-      h += '<div class="villain ' + cls + '"><div class="v-emoji">' + p.emoji + '</div><div class="v-name">' + escapeHtml(p.name) +
-        '</div><div class="v-state">' + (cls === "caught" ? "пойман" : cls === "escaped" ? "ускользнул" : "не встретился") + "</div></div>";
+      h += '<div class="villain ' + cls + '" style="--vc:' + (p.color || "#7350ff") + '"><div class="v-emoji">' + (cls === "unmet" ? "❔" : p.emoji) + '</div><div class="v-name">' +
+        escapeHtml(cls === "unmet" ? "???" : (p.brName || p.name)) + '</div><div class="v-state">' + (cls === "caught" ? "БДЫЩ!" : cls === "escaped" ? "ускользнул" : "не встретился") + "</div></div>";
     });
     $("villains-grid").innerHTML = h;
-    $("villains-title").textContent = "Разоблачено жуликов: " + villainsCaught + " из " + villainsTotal;
+    $("villains-title").textContent = "Коллекция жуликов: " + villainsCaught + " из " + villainsTotal;
     $("end-villains").classList.toggle("hidden", !villainsTotal);
+  }
+
+  function renderAchievements() {
+    var el = $("end-ach");
+    el.innerHTML = achEarned.map(function (id) { var a = achById[id]; return '<span class="ach-chip">' + a.emoji + " " + escapeHtml(a.title) + "</span>"; }).join("");
+    el.classList.toggle("hidden", !achEarned.length);
   }
 
   // «Доказательство обучения»: точность в первой и второй половине забега
@@ -616,7 +661,7 @@
         coinLine--; itemTimer = coinLine > 0 ? 0.16 : D("itemEvery", 0.7);
       } else {
         // препятствие — только в фазе бега и не прямо перед карточкой (иначе наказывали бы за верный ответ)
-        var allowObs = !hasUnresolved && spawnTimer > 1.4 && elapsed > 3;
+        var allowObs = !hasUnresolved && spawnTimer > 1.4 && elapsed > 3 && bossPhase === 0;
         if (allowObs && itemRng() < D("obstacleChance", 0.5)) {
           var ol = (itemRng() * 3) | 0;
           items.push({ kind: itemRng() < 0.5 ? "cone" : "barrier", lane: ol, p: 0 });
@@ -637,12 +682,43 @@
             if (!REDUCED) for (var k = 0; k < 4; k++) addParticle(player.x, pY - 10, (Math.random() - 0.5) * 120, -120 - Math.random() * 80, 0.45, 4, "#ffd23f", 300);
           } else {
             hurtT = 0.4; squashT = 0.2; shake(6); Sound.bad(); Bridge.vibrate(40);
-            addFloat(player.x, pY - 62, it.kind === "cone" ? "Бум!" : "Ай!", "#ff7a92", 22);
+            addFloat(player.x, pY - 90, it.kind === "cone" ? "Бум!" : "Ай!", "#ff7a92", 22);
             chaseHit(D("chaseObstacle", 0.12));
           }
-        }
+        } else if (it.kind !== "coin") { dodged++; if (dodged >= 10) unlock("dodger"); }
       }
-      if (it.got || it.p > 1.3) items.splice(i, 1);
+      if (it.got || it.p > DMAX) items.splice(i, 1);
+    }
+  }
+
+  // ---------- Персонажи, реплики, ачивки ----------
+  function addActor(kind, pat, x, y, sc) { actors.push({ kind: kind, pat: pat, x: x, y: y, x0: x, y0: y, s: sc, t: 0, hit: false, dir: x < W / 2 ? -1 : 1 }); }
+  function addPop(kind, x, y, text, life) { if (pops.length > 4) pops.shift(); pops.push({ kind: kind, x: x, y: y, text: text, life: life, max: life }); }
+  function unlock(id) {
+    if (achEarned.indexOf(id) >= 0 || !achById[id]) return;
+    achEarned.push(id); achQueue.push(achById[id]);
+  }
+  function updateActors(dt) {
+    for (var i = actors.length - 1; i >= 0; i--) {
+      var a = actors[i]; a.t += dt;
+      if (a.kind === "ko") {
+        if (a.t >= 0.42 && !a.hit) {
+          a.hit = true; Sound.bonk(); shake(5);
+          addPop("boom", a.x0, a.y0 - 92, "БДЫЩ!", 0.8);
+          if (!REDUCED) for (var k = 0; k < 8; k++) addParticle(a.x0, a.y0 - 80, (Math.random() - 0.5) * 360, -Math.random() * 260, 0.6, 5, k % 2 ? "#ffd23f" : "#ffffff", 500, 1);
+        }
+        if (a.t > 1.5) actors.splice(i, 1);
+      } else if (a.kind === "steal") {
+        if (a.t > 1.3) actors.splice(i, 1);
+      } else if (a.t > 1.8) actors.splice(i, 1);
+    }
+    for (i = pops.length - 1; i >= 0; i--) { pops[i].life -= dt; if (pops[i].life <= 0) pops.splice(i, 1); }
+    if (toastT > 0) { toastT -= dt; if (toastT <= 0) $("toast").classList.add("hidden"); }
+    else if (achQueue.length) {
+      var ac = achQueue.shift(), el = $("toast");
+      el.innerHTML = '<span class="t-emoji">' + ac.emoji + '</span><span class="t-txt"><b>Ачивка!</b> ' + escapeHtml(ac.title) + "</span>";
+      el.classList.remove("hidden"); el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";
+      toastT = 2.4; Sound.fanfare(); Bridge.vibrate(20);
     }
   }
 
@@ -690,7 +766,14 @@
     }
     timeScale = lerp(timeScale, tsTarget, Math.min(1, dt * (tsTarget < timeScale ? 5 : 9)));
     slowVis = clamp((1 - timeScale) / 0.5, 0, 1);
-    if (slowVis > 0.6 && !slowHintShown) { slowHintShown = true; addFloat(W / 2, H * 0.17, "Не торопись — подумай", "#ffffff", 22); }
+    if (slowVis > 0.6 && !slowHintShown && !(cur && cur.drama)) { slowHintShown = true; addFloat(W / 2, H * 0.17, "Не торопись — подумай", "#ffffff", 22); }
+    if (cur && cur.drama && !cur.dramaShown && (cur.y + cardH()) / pY > 0.5) {
+      cur.dramaShown = true; dramaT = 1.5; Sound.drama(); addFloat(W / 2, H * 0.17, "🤔 Хммм…", "#ffffff", 26);
+    }
+    if (dramaT > 0) dramaT -= dt;
+    updateActors(dt);
+    if (bossHitT > 0) bossHitT -= dt;
+    if (bossPhase > 0) bossT += dt;
     var wdt = dt * timeScale;      // «мировое» время
 
     elapsed += wdt;
@@ -704,7 +787,24 @@
     var hasUnresolved = !!cur;
     if (!hasUnresolved) spawnTimer -= wdt;
     var gap = Math.max(D("runGapMin", 2.2), D("runGapStart", 3.4) - elapsed * 0.01);
-    if (spawnTimer <= 0 && !hasUnresolved && !ending) { spawnSituation(); spawnTimer = gap; }
+    var boss = content.boss;
+    if (bossPhase === 0) {
+      if (boss && cardsSpawned >= (boss.after || 16) && !hasUnresolved && !ending) {
+        // финальный босс: «звонок из банка» — 3 сообщения подряд, потом финиш
+        bossPhase = 1; bossT = 0; dramaT = 1.8; spawnTimer = 2.4; Sound.drama();
+        addPop("speech", W / 2, hy + 120, boss.intro || "📞 Входящий звонок…", 2.3);
+      } else if (spawnTimer <= 0 && !hasUnresolved && !ending) { spawnSituation(); spawnTimer = gap; }
+    } else if (bossPhase <= 2 && !ending) {
+      if (bossIdx < boss.messages.length) {
+        if (spawnTimer <= 0 && !hasUnresolved) { spawnCard(boss.messages[bossIdx], true); bossIdx++; bossPhase = 2; spawnTimer = 1.1; }
+      } else if (!hasUnresolved) {
+        bossPhase = 3;
+        if (bossHits >= 2) { bossGone = true; addActor("bossko", "boss", W * 0.8, hy + 104, 1.1); addPop("boom", W * 0.72, hy + 60, "БДЫЩ!", 1); Sound.bonk(); }
+        if (bossHits >= boss.messages.length) unlock("boss");
+        finished = true; ending = true; endTimer = 2.8;
+        addFloat(W / 2, H * 0.4, "🏁 Финиш!", "#ffd23f", 40); spawnConfetti(W / 2, H * 0.3, 40, true); Sound.fanfare();
+      }
+    }
     updateItems(wdt, hasUnresolved);
 
     // погоня: плавное движение жулика
@@ -754,8 +854,9 @@
       var m = shakeMag * (shakeT / 0.3);
       ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
     }
-    if (slowVis > 0.01 && !REDUCED) {          // лёгкий «наезд камеры» в момент решения
-      var z = 1 + 0.035 * slowVis;
+    var dz = dramaT > 0 ? Math.sin(Math.PI * Math.min(1, (1.5 - dramaT) / 0.35) / 2) * Math.min(1, dramaT / 0.3) : 0;
+    if ((slowVis > 0.01 || dz > 0) && !REDUCED) {          // «наезд камеры»; сильнее — драматичный зум
+      var z = 1 + 0.035 * slowVis + 0.11 * dz;
       ctx.translate(W / 2, pY); ctx.scale(z, z); ctx.translate(-W / 2, -pY);
     }
     drawRoad();
@@ -763,12 +864,19 @@
     for (i = 0; i < items.length; i++) if (items[i].p < cardP) drawItem(items[i]);
     for (i = 0; i < cards.length; i++) drawCard(cards[i]);
     for (i = 0; i < items.length; i++) if (items[i].p >= cardP) drawItem(items[i]);
+    drawBoss();
     drawVillain();      // позади героя, чтобы герой всегда был виден
     drawPlayer();
+    drawActors();
     drawFx();
     ctx.restore();
+    drawPops();             // реплики — вне зума камеры, чтобы не обрезались у краёв
     drawVignette();
     drawSlowFx();
+    if (dz > 0) {                                // киношные полосы — мем «драматичный зум»
+      var bh = 46 * dz; ctx.fillStyle = "#14143a";
+      ctx.fillRect(0, 0, W, bh); ctx.fillRect(0, H - bh, W, bh);
+    }
   }
 
   // Рамка «фокуса» во время замедления
@@ -781,7 +889,7 @@
   }
 
   function drawItem(it) {
-    var p = Math.min(it.p, 1.3), r = rOf(p), y = yOf(r), x = sxAt(laneX(it.lane), r);
+    var p = Math.min(it.p, DMAX), r = rOf(p), y = yOf(r), x = sxAt(laneX(it.lane), r);
     if (y > H + 60) return;
     ctx.save(); ctx.translate(x, y);
     // тень
@@ -818,42 +926,121 @@
     ctx.restore();
   }
 
-  // Жулик сзади героя: чем ближе погоня, тем выше он выглядывает из-за нижней панели
-  function drawVillain() {
-    if (state !== "run") return;
-    var knock = villainKnock > 0 ? Math.sin(Math.PI * (1 - villainKnock / 0.6)) * 40 : 0;
-    var vy = pY + 74 + chaseVis * 120 + knock, vx = villainX;
-    if (vy - 100 > H) return;
-    var bob = Math.abs(Math.sin(player.bob * 1.1)) * 4, s = 1.25;
-    ctx.save(); ctx.translate(vx, vy - bob); ctx.scale(s, s);
-    // ноги
-    var sw = Math.sin(player.bob * 1.1);
+  // Персонаж-жулик: балахон цвета приёма, маска, значок-эмодзи приёма на груди
+  function drawCrook(x, y, sc, pat, expr, rot, alpha) {
+    var v = patternById[pat] || {}, col = v.color || "#4a2bd0";
+    ctx.save(); ctx.translate(x, y); if (rot) ctx.rotate(rot); ctx.scale(sc, sc);
+    if (alpha != null) ctx.globalAlpha = alpha;
+    var sw = Math.sin(tAnim * 14);
     ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.lineCap = "round";
     ctx.beginPath(); ctx.moveTo(-9, -6); ctx.lineTo(-9, 4 + sw * 4); ctx.moveTo(9, -6); ctx.lineTo(9, 4 - sw * 4); ctx.stroke();
-    // тело-балахон
-    ctx.fillStyle = "#4a2bd0"; ctx.strokeStyle = INK; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(-26, -4); ctx.quadraticCurveTo(-30, -52, 0, -64); ctx.quadraticCurveTo(30, -52, 26, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
-    // лицо
+    ctx.fillStyle = col; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-26, -4); ctx.quadraticCurveTo(-30, -52, 0, -66); ctx.quadraticCurveTo(30, -52, 26, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.beginPath(); ctx.ellipse(-10, -50, 7, 4, -0.6, 0, 6.2832); ctx.fill();
     ctx.fillStyle = "#ffd9b8"; ctx.beginPath(); ctx.ellipse(0, -38, 16, 14, 0, 0, 6.2832); ctx.fill();
-    // маска
     ctx.fillStyle = "#14143a"; roundRect(-18, -46, 36, 11, 5); ctx.fill();
-    var look = clamp((player.x - vx) / 60, -1, 1) * 2;
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-7, -40.5, 3.6, 0, 6.2832); ctx.arc(7, -40.5, 3.6, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(-7 + look, -41.5, 1.8, 0, 6.2832); ctx.arc(7 + look, -41.5, 1.8, 0, 6.2832); ctx.fill();
-    // ухмылка
-    ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(2, -32, 6, 0.15 * Math.PI, 0.8 * Math.PI); ctx.stroke();
-    // руки тянутся к герою, когда близко
-    var reach = clamp(1 - chaseVis / 0.5, 0, 1) * 10;
-    ctx.fillStyle = "#ffd9b8"; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
-    ctx.beginPath(); ctx.arc(-28, -26 - reach, 5.5, 0, 6.2832); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.arc(28, -26 - reach, 5.5, 0, 6.2832); ctx.fill(); ctx.stroke();
-    ctx.restore();
-    if (chaseVis < 0.4 && !ending) {
-      var a = 0.6 + 0.4 * Math.sin(tAnim * 10);
-      ctx.globalAlpha = a; ctx.font = "900 26px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.strokeText("!", vx + 40, vy - 86 * s); ctx.fillStyle = "#ff4d6d"; ctx.fillText("!", vx + 40, vy - 86 * s);
-      ctx.globalAlpha = 1;
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = INK; ctx.lineWidth = 2.2;
+    if (expr === "dizzy") {
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-10, -43); ctx.lineTo(-4, -38); ctx.moveTo(-4, -43); ctx.lineTo(-10, -38);
+      ctx.moveTo(4, -43); ctx.lineTo(10, -38); ctx.moveTo(10, -43); ctx.lineTo(4, -38); ctx.stroke();
+      ctx.strokeStyle = INK; ctx.beginPath(); ctx.arc(0, -28, 4, Math.PI, 0); ctx.stroke();
+    } else {
+      var er = expr === "shock" ? 4.6 : 3.6;
+      ctx.beginPath(); ctx.arc(-7, -40.5, er, 0, 6.2832); ctx.arc(7, -40.5, er, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(-7, -41, 1.9, 0, 6.2832); ctx.arc(7, -41, 1.9, 0, 6.2832); ctx.fill();
+      ctx.beginPath();
+      if (expr === "shock") { ctx.fillStyle = INK; ctx.ellipse(1, -29, 4, 5, 0, 0, 6.2832); ctx.fill(); }
+      else if (expr === "laugh") { ctx.fillStyle = "#8a1f3a"; ctx.arc(1, -32, 6.5, 0, Math.PI); ctx.fill(); }
+      else { ctx.arc(2, -32, 6, 0.15 * Math.PI, 0.8 * Math.PI); ctx.stroke(); }
     }
+    ctx.fillStyle = "#ffd9b8"; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    var up = expr === "shock" || expr === "dizzy" ? -14 : 0;
+    ctx.beginPath(); ctx.arc(-28, -26 + up, 5.5, 0, 6.2832); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(28, -26 + up, 5.5, 0, 6.2832); ctx.fill(); ctx.stroke();
+    if (v.emoji) { ctx.font = "15px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(v.emoji, 0, -14); }
+    ctx.restore();
+  }
+
+  // Нокдаун (выпрыгнул из телефона → БДЫЩ! → улетел), кража монет, нокаут босса
+  function drawActors() {
+    for (var i = 0; i < actors.length; i++) {
+      var a = actors[i], t = a.t;
+      if (a.kind === "ko") {
+        if (t < 0.42) {
+          var u = Math.min(1, t / 0.22), pop = easeOutBack(u);
+          drawCrook(a.x0, a.y0 - 30 - 40 * pop, 1.05 * (0.5 + 0.5 * pop), a.pat, "shock", Math.sin(t * 30) * 0.05);
+        } else {
+          var f = t - 0.42;
+          var fx = a.x0 - a.dir * 340 * f, fy = a.y0 - 70 - 420 * f + 260 * f * f;
+          drawCrook(fx, fy, Math.max(0.2, 1.05 - f * 0.7), a.pat, "dizzy", f * 12 * -a.dir, Math.max(0, 1 - f / 1.05));
+        }
+      } else if (a.kind === "steal") {
+        var k = clamp((t - 0.25) / 1.0, 0, 1), sx2 = lerp(a.x0, player.x + 30, k), sy2 = lerp(a.y0 - 20, pY + 170, k * k);
+        drawCrook(sx2, sy2 - (t < 0.25 ? 40 * easeOutBack(t / 0.25) : 40 * (1 - k)), 1.05, a.pat, "laugh", Math.sin(t * 20) * 0.08);
+      } else if (a.kind === "bossko") {
+        var g = t;
+        drawCrook(a.x0 + 200 * g, a.y0 - 300 * g + 200 * g * g, Math.max(0.3, 1.5 - g * 0.6), "boss", "dizzy", g * 9, Math.max(0, 1 - g / 1.6));
+      }
+    }
+  }
+
+  // Босс у горизонта: «звонит» с телефоном в руке, сверху — его «жизни»
+  function drawBoss() {
+    if (bossPhase === 0 || bossGone || state !== "run") return;
+    // босс сбоку у горизонта — не перекрывается пузырями его сообщений
+    var app = Math.min(1, bossT / 0.6), bx = W * 0.8 + Math.sin(tAnim * 1.3) * 8, by = hy + 104 + (1 - easeOutBack(app)) * -80;
+    var shk = bossHitT > 0 ? Math.sin(bossHitT * 60) * 6 : 0;
+    drawCrook(bx + shk, by, 1.1 * app, "boss", bossHitT > 0 ? "shock" : "grin", 0);
+    ctx.save(); ctx.translate(bx + shk - 34 * 1.1, by - 46 * 1.1); ctx.rotate(-0.3);
+    ctx.fillStyle = "#14143a"; roundRect(-7, -13, 14, 26, 4); ctx.fill(); ctx.fillStyle = "#9fd3ff"; roundRect(-5, -10, 10, 18, 2); ctx.fill();
+    ctx.restore();
+    var total = content.boss.messages.length, left = total - bossHits;
+    ctx.font = "16px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    var hs = ""; for (var i = 0; i < total; i++) hs += i < left ? "❤️" : "🤍";
+    ctx.fillText(hs, bx, by - 88);
+    ctx.font = "900 13px " + FONT; ctx.lineWidth = 4; ctx.strokeStyle = "#fff"; ctx.lineJoin = "round";
+    var nx = Math.min(bx, W - ctx.measureText(content.boss.brName).width / 2 - 8);
+    ctx.strokeText(content.boss.brName, nx, by - 106); ctx.fillStyle = INK; ctx.fillText(content.boss.brName, nx, by - 106);
+  }
+
+  // Комиксные «БДЫЩ!» и реплики-пузыри персонажей
+  function drawPops() {
+    for (var i = 0; i < pops.length; i++) {
+      var p = pops[i], k = 1 - p.life / p.max, a = p.life < 0.3 ? p.life / 0.3 : 1;
+      var sc = k < 0.15 ? easeOutBack(k / 0.15) : 1, j;
+      ctx.save(); ctx.globalAlpha = a;
+      if (p.kind === "boom") {
+        ctx.translate(p.x, p.y); ctx.rotate(-0.12); ctx.scale(sc, sc);
+        ctx.beginPath();
+        for (j = 0; j < 24; j++) { var ang = j / 24 * 6.2832, rr = j % 2 ? 34 : 54; ctx.lineTo(Math.cos(ang) * rr * 1.25, Math.sin(ang) * rr * 0.85); }
+        ctx.closePath(); ctx.fillStyle = "#ffd23f"; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = "#ff4d6d"; ctx.stroke();
+        ctx.font = "900 24px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.lineWidth = 5; ctx.strokeStyle = "#fff"; ctx.lineJoin = "round"; ctx.strokeText(p.text, 0, 1); ctx.fillStyle = INK; ctx.fillText(p.text, 0, 1);
+      } else {
+        ctx.font = "800 14.5px " + FONT;
+        var lines = wrapLines(p.text, 196), lw = 0;
+        for (j = 0; j < lines.length; j++) lw = Math.max(lw, ctx.measureText(lines[j]).width);
+        var bw = lw + 24, bh = lines.length * 19 + 16, x = clamp(p.x, bw / 2 + 8, W - bw / 2 - 8), y = clamp(p.y, 70 + bh / 2, H - 200);
+        ctx.translate(x, y); ctx.scale(sc, sc);
+        ctx.fillStyle = "rgba(35,36,106,0.18)"; roundRect(-bw / 2, -bh / 2 + 4, bw, bh, 14); ctx.fill();
+        ctx.fillStyle = "#fff"; roundRect(-bw / 2, -bh / 2, bw, bh, 14); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-8, bh / 2 - 1); ctx.lineTo(0, bh / 2 + 9); ctx.lineTo(8, bh / 2 - 1); ctx.closePath(); ctx.fill();
+        ctx.lineWidth = 2.5; ctx.strokeStyle = INK; roundRect(-bw / 2, -bh / 2, bw, bh, 14); ctx.stroke();
+        ctx.fillStyle = INK; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        for (j = 0; j < lines.length; j++) ctx.fillText(lines[j], 0, -bh / 2 + 17 + j * 19);
+      }
+      ctx.restore();
+    }
+  }
+
+  // Жулик-преследователь сзади: цвет — последнего жулика, которого ты пропустил
+  function drawVillain() {
+    if (state !== "run" || chaseVis > 0.9) return;
+    var knock = villainKnock > 0 ? Math.sin(Math.PI * (1 - villainKnock / 0.6)) * 40 : 0;
+    var vy = pY + 70 + chaseVis * 110 + knock;
+    if (vy - 80 > H) return;
+    drawCrook(villainX, vy - Math.abs(Math.sin(player.bob * 1.1)) * 4, 1.05, chasePat, chaseVis < 0.35 ? "laugh" : "grin", 0);
   }
 
   function drawVignette() {
@@ -893,7 +1080,7 @@
     ctx.fillStyle = "rgba(255,255,255,0.13)";
     for (i = 0; i <= N; i++) {
       if (((i - fl) & 1) === 0) continue;
-      var pa = clamp((i - 1 + ph) / N, 0, 1.3), pb = clamp((i + ph) / N, 0, 1.3);
+      var pa = clamp((i - 1 + ph) / N, 0, DMAX), pb = clamp((i + ph) / N, 0, DMAX);
       var ya = yOf(rOf(pa)), yb = yOf(rOf(pb));
       if (yb > ya && ya < H) ctx.fillRect(0, ya, W, Math.min(yb, H) - ya + 1);
     }
@@ -916,7 +1103,7 @@
     N = 12; ph = (u * N) % 1;
     ctx.fillStyle = "rgba(35,36,106,0.07)";
     for (i = 0; i <= N + 2; i++) {
-      var pt = (i - 1 + ph) / N; if (pt < 0) continue; if (pt > 1.3) break;
+      var pt = (i - 1 + ph) / N; if (pt < 0) continue; if (pt > DMAX) break;
       var rt = rOf(pt), yt = yOf(rt); if (yt > H) break;
       ctx.fillRect(sxAt(0, rt), yt, (W) * rt, Math.max(1, 2.2 * rt));
     }
@@ -940,8 +1127,8 @@
     ctx.beginPath();
     for (i = 0; i <= N + 3; i++) {
       var pd = (i - 1 + ph) / N, pe = pd + 0.5 / N;
-      if (pe <= 0) continue; if (pd >= 1.3) break;
-      pd = Math.max(0, pd); pe = Math.min(1.3, pe);
+      if (pe <= 0) continue; if (pd >= DMAX) break;
+      pd = Math.max(0, pd); pe = Math.min(DMAX, pe);
       var ra = rOf(pd), rb = rOf(pe), ya2 = yOf(ra), yb2 = yOf(rb);
       if (ya2 >= H) break;
       for (j = 1; j < LANES; j++) {
@@ -960,7 +1147,7 @@
       ctx.beginPath();
       var cxb = W * (j + 0.5) / LANES;
       for (i = 0; i <= N + 1; i++) {
-        var pc = (i - 1 + ph) / N; if (pc < 0.05) continue; if (pc > 1.22) break;
+        var pc = (i - 1 + ph) / N; if (pc < 0.05) continue; if (pc > DMAX) break;
         var rc = rOf(pc), yc = yOf(rc), sz = 14 * rc, cx2 = sxAt(cxb, rc);
         if (yc > H - 4) break;
         ctx.moveTo(cx2 - sz, yc + sz * 0.5); ctx.lineTo(cx2, yc - sz * 0.5); ctx.lineTo(cx2 + sz, yc + sz * 0.5);
@@ -971,12 +1158,12 @@
 
     // линия решения на уровне героя
     ctx.fillStyle = "rgba(115,80,255," + (0.1 + 0.06 * Math.sin(tAnim * 5)) + ")";
-    ctx.fillRect(sxAt(0, 1), pY + 31, W, 3);
+    ctx.fillRect(sxAt(0, 1), pY + 31 * HS, W, 3);
 
     // придорожные деревья и кусты (двигаются синхронно с карточками)
     N = 7; ph = (u * N) % 1; fl = Math.floor(u * N);
     for (i = 0; i <= N; i++) {
-      var pp = (i + ph) / N; if (pp > 1.28) break;
+      var pp = (i + ph) / N; if (pp > DMAX) break;
       r = rOf(pp); y = yOf(r);
       var tree = ((i - fl) & 1) === 0;
       for (j = -1; j <= 1; j += 2) {
@@ -1028,73 +1215,66 @@
     return lines.slice(0, 3);
   }
 
+  // Карточка = телефон на ножках (одинаковый для всех — ребёнок читает текст, а не внешность) + пузырь-сообщение
+  function drawPhone(c) {
+    var run = Math.sin(tAnim * 14 + c.ph);
+    ctx.strokeStyle = INK; ctx.lineWidth = 4.5; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-6, -8); ctx.lineTo(-6 + run * 3, 0); ctx.moveTo(6, -8); ctx.lineTo(6 - run * 3, 0); ctx.stroke();
+    ctx.fillStyle = "#2b2d6e"; roundRect(-16, -PH_H + 4, 32, 38, 8); ctx.fill();
+    ctx.fillStyle = c.boss ? "#ffd9e0" : "#bfe3ff"; roundRect(-12, -PH_H + 8, 24, 28, 5); ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.beginPath(); ctx.arc(-5, -PH_H + 19, 2.2, 0, 6.2832); ctx.arc(5, -PH_H + 19, 2.2, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = INK; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(0, -PH_H + 24, 3.5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
   function drawCard(c) {
     var w = cardW(), h = cardH();
-    var p = clamp((c.y + h) / pY, 0, 1.38);
+    var p = clamp((c.y + h) / pY, 0, DMAX);
     var r = rOf(p), sy = yOf(r), sx = sxAt(c.x, r);
     var rn = clamp((r - RT) / (1 - RT), 0, 1.4);
-    var s = (0.8 + 0.2 * rn) * (c.resolved ? 1 : 1 + 0.08 * slowVis);   // читаемость; в замедлении — чуть крупнее
+    var s = (0.8 + 0.2 * rn) * (c.resolved ? 1 : 1 + 0.08 * slowVis);
     var alpha = clamp(c.age / 0.18, 0, 1), pop = 1;
     if (c.age < 0.28) pop = 0.55 + 0.45 * easeOutBack(c.age / 0.28);
-    var lift = 0;
+    var bubA = 1, phA = 1, lift = 0, shx = 0;
     if (c.resolved) {
-      var fo = clamp(c.removeTimer / 0.5, 0, 1), k = 1 - fo;
-      if (c.result === "ok") {
-        // карточка влетает в героя: «поймал»
-        var kk = k * k * (3 - 2 * k);
-        sx = lerp(sx, player.x, kk); sy = lerp(sy, pY - 12, kk);
-        pop *= 1 - 0.55 * kk; alpha *= k < 0.7 ? 1 : (1 - k) / 0.3;
-      } else {
-        // карточка «разбивается»: дрожит и краснеет
-        sx += Math.sin(k * 55) * 7 * fo; pop *= 1 + k * 0.18; alpha *= fo < 0.4 ? fo / 0.4 : 1; lift = k * 10;
-      }
+      var k = 1 - clamp(c.removeTimer / c.removeMax, 0, 1);
+      if (c.result === "ok" && c.isTrap && !c.boss) { bubA = 1 - clamp(k / 0.35, 0, 1); phA = 1 - clamp((k - 0.4) / 0.6, 0, 1); }
+      else if (c.result === "ok") { bubA = phA = 1 - k; lift = k * 16; }
+      else { shx = Math.sin(k * 55) * 7 * (1 - k); bubA = phA = 1 - k; }
     }
-    if (alpha <= 0.01) return;
-    var half = (w / 2) * s * pop + 6;              // карточка не вылезает за край экрана
+    if (alpha * Math.max(bubA, phA) <= 0.01) return;
+    var half = (w / 2) * s * pop + 6;
     sx = clamp(sx, half, W - half);
     var x = -w / 2, y = -h;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.translate(sx, sy - lift);
+    ctx.translate(sx + shx, sy - lift);
     ctx.scale(s * pop, s * pop);
-    // тень на дороге
+    ctx.globalAlpha = alpha * phA;
     ctx.fillStyle = "rgba(35,36,106,0.16)";
-    ctx.beginPath(); ctx.ellipse(0, 12, w * 0.42, 7, 0, 0, 6.2832); ctx.fill();
-    // фон карточки нейтральный (чтобы ребёнок читал текст, а не цвет): белая наклейка с «пластиковым» низом
-    ctx.fillStyle = "#cdd8ee";
-    roundRect(x, y + 5, w, h, 18); ctx.fill();
-    ctx.fillStyle = "#ffffff";
-    roundRect(x, y, w, h, 18); ctx.fill();
-    // «хвостик» сообщения
-    ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(0, 9); ctx.lineTo(9, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 2, 26, 6, 0, 0, 6.2832); ctx.fill();
+    drawPhone(c);
+    ctx.globalAlpha = alpha * bubA;
+    ctx.fillStyle = "#cdd8ee"; roundRect(x, y + 5, w, BUB_H, 18); ctx.fill();
+    ctx.fillStyle = "#ffffff"; roundRect(x, y, w, BUB_H, 18); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-9, y + BUB_H - 1); ctx.lineTo(0, y + BUB_H + 9); ctx.lineTo(9, y + BUB_H - 1); ctx.closePath(); ctx.fill();
     var border = "rgba(35,36,106,0.06)";
     if (c.flashT > 0) border = c.result === "ok" ? "rgba(34,195,122,0.95)" : "rgba(255,77,109,0.95)";
     ctx.lineWidth = c.flashT > 0 ? 3.5 : 1.5; ctx.strokeStyle = border;
-    roundRect(x, y, w, h, 18); ctx.stroke();
-
-    // иконка
+    roundRect(x, y, w, BUB_H, 18); ctx.stroke();
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = "30px " + FONT;
-    ctx.fillStyle = "#000";
-    ctx.fillText(c.icon, 0, y + 25);
-    // текст (перенос предвычислен при появлении)
-    ctx.fillStyle = INK;
-    ctx.font = "800 15.5px " + FONT;
-    for (var i = 0; i < c.lines.length; i++) ctx.fillText(c.lines[i], 0, y + 54 + i * 18);
-
-    // штамп результата (после решения)
+    ctx.font = "28px " + FONT; ctx.fillStyle = "#000";
+    ctx.fillText(c.icon, 0, y + 24);
+    ctx.fillStyle = INK; ctx.font = "800 15.5px " + FONT;
+    for (var i = 0; i < c.lines.length; i++) ctx.fillText(c.lines[i], 0, y + 53 + i * 18);
     if (c.resolved) {
-      var st = easeOutBack(clamp((0.5 - c.removeTimer) / 0.2 + 0.2, 0, 1));
-      var bx = w / 2 - 6, by = y + 6;
-      ctx.save(); ctx.translate(bx, by); ctx.scale(st, st);
+      var st = easeOutBack(clamp((c.removeMax - c.removeTimer) / 0.2 + 0.2, 0, 1));
+      ctx.save(); ctx.translate(w / 2 - 6, y + 6); ctx.scale(st, st);
       ctx.fillStyle = c.result === "ok" ? "#22c37a" : "#ff4d6d";
       ctx.beginPath(); ctx.arc(0, 0, 13, 0, 6.2832); ctx.fill();
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 3.2; ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.beginPath();
       if (c.result === "ok") { ctx.moveTo(-6, 0); ctx.lineTo(-2, 5); ctx.lineTo(6, -5); }
       else { ctx.moveTo(-5, -5); ctx.lineTo(5, 5); ctx.moveTo(5, -5); ctx.lineTo(-5, 5); }
-      ctx.stroke();
-      ctx.restore();
+      ctx.stroke(); ctx.restore();
     }
     ctx.restore();
   }
@@ -1124,17 +1304,17 @@
     var air = hop < -2 ? clamp(-hop / 20, 0, 1) : 0;
 
     // кольцо под ногами цвета текущей дорожки + тень
-    var gy = playerY() + 36;
+    var gy = playerY() + 36 * HS;
     ctx.fillStyle = "rgba(" + LANE_RGB[player.lane] + "," + (0.28 + 0.1 * Math.sin(tAnim * 6)) + ")";
-    ctx.beginPath(); ctx.ellipse(x, gy, 34 - air * 8, 11 - air * 3, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, gy, (34 - air * 8) * HS, (11 - air * 3) * HS, 0, 0, 6.2832); ctx.fill();
     ctx.fillStyle = "rgba(35,36,106," + (0.22 - air * 0.1) + ")";
-    ctx.beginPath(); ctx.ellipse(x, gy, 22 - air * 6 + sq * 4, 7 - air * 2, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, gy, (22 - air * 6 + sq * 4) * HS, (7 - air * 2) * HS, 0, 0, 6.2832); ctx.fill();
 
     // шлейф-призраки при смене дорожки
     var moving = Math.abs(dx) > 8;
     if (moving && !REDUCED) {
       for (var gI = 0; gI < 3; gI++) {
-        ctx.save(); ctx.translate(ghostX[gI], y); ctx.globalAlpha = 0.22 - gI * 0.06; shieldPath();
+        ctx.save(); ctx.translate(ghostX[gI], y); ctx.scale(HS, HS); ctx.globalAlpha = 0.22 - gI * 0.06; shieldPath();
         ctx.fillStyle = "#00c1a0"; ctx.fill(); ctx.restore();
       }
     }
@@ -1142,12 +1322,12 @@
 
     // аура
     ctx.globalAlpha = 0.18 + 0.4 * feverGlow;
-    var ag = 58 + feverGlow * 10;
+    var ag = (58 + feverGlow * 10) * HS;
     ctx.drawImage(feverGlow > 0.5 ? glowGold : glowGreen, x - ag, y - ag, ag * 2, ag * 2);
     ctx.globalAlpha = 1;
 
     ctx.save();
-    ctx.translate(x, y); ctx.rotate(lean + wob); ctx.scale(sx, sy);
+    ctx.translate(x, y); ctx.rotate(lean + wob); ctx.scale(sx * HS, sy * HS);
     if (hurtT > 0 && ((hurtT * 14) | 0) % 2 === 0) ctx.globalAlpha = 0.55;
 
     var sw = Math.sin(player.bob);
@@ -1249,6 +1429,7 @@
     $("btn-share").addEventListener("click", function () {
       Bridge.share({
         text: "Я разоблачил " + villainsCaught + " из " + villainsTotal + " жуликов в «Не попадись!» 🛡️ " +
+          (achEarned.length ? "Ачивок: " + achEarned.length + ". " : "") +
           "Пройди мой забег — код " + runCode + ". Сможешь лучше?",
         runCode: runCode
       });
