@@ -669,7 +669,10 @@
     var seen = {}, uniq = [];
     for (var i = 0; i < misses.length; i++) { var m = misses[i]; if (seen[m.text]) continue; seen[m.text] = 1; uniq.push(m); }
     if (!uniq.length) {
-      el.innerHTML = '<p class="review-allgood">🎉 Ни одной ошибки — ты раскусил все ловушки!</p>';
+      // Хвалим за «без ошибок» только если ребёнок реально встречал ловушки
+      el.innerHTML = decisionsTotal > 0
+        ? '<p class="review-allgood">🎉 Ни одной ошибки — ты раскусил все ловушки!</p>'
+        : '<p class="review-neutral">Ловушки ждут впереди — беги дальше и проверяй сообщения!</p>';
       return;
     }
     var html = '<p class="review-title">Разбор — нажми, чтобы понять:</p>';

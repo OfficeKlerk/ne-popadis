@@ -394,3 +394,4 @@ button { font-family: inherit; }
   #btn-play { animation: riseIn 0.4s ease-out 0.55s both; }
   .badge, .end-review { animation: none; }
 }
+.review-neutral { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink-2); background: #eef3ff; border: 2px solid #d7e2ff; border-radius: 14px; padding: 10px 12px; }
