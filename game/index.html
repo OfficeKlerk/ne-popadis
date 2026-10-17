@@ -27,9 +27,9 @@
 
     <!-- Подсказка действий (нижние дорожки) -->
     <div id="lane-legend" class="lane-legend hidden">
-      <div class="legend-item" data-lane="0"><span class="legend-emoji">🛑</span><span>Отказать</span></div>
-      <div class="legend-item" data-lane="1"><span class="legend-emoji">🔎</span><span>Проверить</span></div>
-      <div class="legend-item" data-lane="2"><span class="legend-emoji">✅</span><span>Можно</span></div>
+      <button class="legend-item lane-btn" data-lane="0" aria-label="Отказать"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span class="lb-label">Отказать</span></button>
+      <button class="legend-item lane-btn" data-lane="1" aria-label="Проверить"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15.2 15.2l4.8 4.8"/></svg></span><span class="lb-label">Проверить</span></button>
+      <button class="legend-item lane-btn" data-lane="2" aria-label="Можно"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="lb-label">Можно</span></button>
     </div>
 
     <!-- Всплывающее «почему» при ошибке -->
@@ -45,15 +45,15 @@
             <path d="M23 32l7 7 12-14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <h1 class="game-title">Не попадись!</h1>
+        <h1 class="game-title">Не <span class="accent">попадись!</span></h1>
         <p class="subtitle">Разоблачи 7 жуликов на бегу</p>
       </div>
 
       <div class="howto">
         <p class="howto-title">Уводи героя на нужную дорожку:</p>
-        <div class="howto-row r0"><span class="he">🛑</span><b>Отказать</b> — просят отдать код, деньги, карту, секрет или торопят</div>
-        <div class="howto-row r1"><span class="he">🔎</span><b>Проверить</b> — непонятно, кто пишет или куда ведёт ссылка</div>
-        <div class="howto-row r2"><span class="he">✅</span><b>Можно</b> — мама, друг, приложение банка</div>
+        <div class="howto-row r0"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span><b>Отказать</b> — просят отдать код, деньги, карту, секрет или торопят</span></div>
+        <div class="howto-row r1"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15.2 15.2l4.8 4.8"/></svg></span><span><b>Проверить</b> — непонятно, кто пишет или куда ведёт ссылка</span></div>
+        <div class="howto-row r2"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Можно</b> — мама, друг, приложение банка</span></div>
       </div>
 
       <button class="btn-primary" id="btn-play">Играть</button>
@@ -69,7 +69,7 @@
         <span class="pill" aria-hidden="true"></span>
         <span class="sound-lbl">Звук</span>
       </label>
-      <p class="hint">Свайп влево/вправо или нажми на сторону экрана</p>
+      <p class="hint">Жми кнопки внизу или свайпай влево/вправо</p>
     </section>
 
     <!-- Экран итога -->

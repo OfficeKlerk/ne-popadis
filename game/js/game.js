@@ -90,8 +90,9 @@
   var feverGlow = 0;              // плавная подсветка серии
   var laneFlash = [0, 0, 0];      // вспышка дорожки при решении
   var laneHint = [0, 0, 0];       // подсказка «верная дорожка» после ошибки
-  var LANE_COLORS = ["#ff5a5f", "#3e9bff", "#2fd06e"]; // отказать / проверить / можно
-  var LANE_RGB = ["255,90,95", "62,155,255", "47,208,110"];
+  var LANE_COLORS = ["#ff4d6d", "#7350ff", "#22c37a"]; // отказать / проверить / можно
+  var LANE_RGB = ["255,77,109", "115,80,255", "34,195,122"];
+  var INK = "#23246a";
   var FONT = "-apple-system, system-ui, 'Segoe UI', Roboto, sans-serif";
 
   // ---------- Геометрия псевдо-перспективы ----------
@@ -100,8 +101,8 @@
   var KP = 1 / RT - 1;
   var hy = 0, y0 = 0, pY = 0, rB = 1;
   var skyGrad, groundGrad, roadGrad;
-  var glowTeal, glowGold, glowGreen;
-  var skyFar, skyNear, stars = [];
+  var glowSun, glowGold, glowGreen;
+  var townFar, townNear, cloudImg, clouds = [];
   var streakAng = [];
   for (var sa = 0; sa < 12; sa++) streakAng.push(0.12 * Math.PI + (sa / 11) * 0.76 * Math.PI);
 
@@ -118,24 +119,58 @@
     return c;
   }
 
-  function makeSkyline(w, h, seed, base, lit, windows) {
+  // Игрушечный городок на горизонте (пастельные домики, деревья-шарики).
+  // Рисуется один раз и размывается — эффект tilt-shift, как у макета-диорамы.
+  function makeTown(w, h, seed, blur, scale) {
     var c = document.createElement("canvas"); c.width = Math.round(w * DPR); c.height = Math.round(h * DPR);
     var g = c.getContext("2d"); g.scale(DPR, DPR);
     var s = seed;
     function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
-    var x = -4;
+    var WALLS = ["#ffffff", "#fff3d6", "#e8f0ff", "#ffe3ea", "#e6fff2"];
+    var ROOFS = ["#ff7a92", "#7350ff", "#ffb020", "#22c37a", "#5aa9ff"];
+    var x = -6;
     while (x < w) {
-      var bw = 18 + rnd() * 34, bh = h * (0.28 + rnd() * 0.72);
-      g.fillStyle = base; g.fillRect(x, h - bh, bw, bh);
-      if (rnd() > 0.7) g.fillRect(x + bw * 0.3, h - bh - 8, bw * 0.4, 8);
-      if (windows) {
-        g.fillStyle = lit;
-        for (var wy = h - bh + 6; wy < h - 4; wy += 9) {
-          for (var wx = x + 4; wx < x + bw - 4; wx += 8) { if (rnd() > 0.72) g.fillRect(wx, wy, 3, 4); }
-        }
+      if (rnd() < 0.3) {
+        // дерево-шарик
+        var tr = (9 + rnd() * 7) * scale, tx = x + tr;
+        g.fillStyle = "#b07a4f"; g.fillRect(tx - 2 * scale, h - 10 * scale, 4 * scale, 10 * scale);
+        var tg = g.createRadialGradient(tx - tr * 0.35, h - 10 * scale - tr * 1.3, 1, tx, h - 10 * scale - tr, tr * 1.1);
+        tg.addColorStop(0, "#9ef07f"); tg.addColorStop(1, "#45b13c");
+        g.fillStyle = tg; g.beginPath(); g.arc(tx, h - 10 * scale - tr, tr, 0, 6.2832); g.fill();
+        x += tr * 2 + 3;
+        continue;
       }
-      x += bw + 1 + rnd() * 5;
+      var bw = (22 + rnd() * 26) * scale, bh = (18 + rnd() * 26) * scale, roofH = (8 + rnd() * 10) * scale;
+      var wall = WALLS[(rnd() * WALLS.length) | 0], roof = ROOFS[(rnd() * ROOFS.length) | 0];
+      // стена + боковая тень
+      g.fillStyle = wall; g.fillRect(x, h - bh, bw, bh);
+      g.fillStyle = "rgba(35,36,106,0.08)"; g.fillRect(x + bw * 0.72, h - bh, bw * 0.28, bh);
+      // крыша
+      g.fillStyle = roof; g.beginPath(); g.moveTo(x - 3, h - bh); g.lineTo(x + bw / 2, h - bh - roofH); g.lineTo(x + bw + 3, h - bh); g.closePath(); g.fill();
+      // окна
+      g.fillStyle = "#9fd3ff";
+      for (var wy = h - bh + 5 * scale; wy < h - 9 * scale; wy += 10 * scale)
+        for (var wx = x + 4 * scale; wx < x + bw - 7 * scale; wx += 9 * scale) g.fillRect(wx, wy, 4.5 * scale, 5 * scale);
+      x += bw + 2 + rnd() * 6;
     }
+    if (!blur) return c;
+    // tilt-shift: копия с размытием (если ctx.filter не поддерживается — остаётся чёткой)
+    var b = document.createElement("canvas"); b.width = c.width; b.height = c.height;
+    var bg = b.getContext("2d");
+    try { bg.filter = "blur(" + Math.round(blur * DPR) + "px)"; } catch (e) {}
+    bg.drawImage(c, 0, 0);
+    return b;
+  }
+
+  function makeCloud() {
+    var c = document.createElement("canvas"), w = 150, h = 60;
+    c.width = w * DPR; c.height = h * DPR;
+    var g = c.getContext("2d"); g.scale(DPR, DPR);
+    g.fillStyle = "rgba(160,190,235,0.35)";
+    g.beginPath(); g.ellipse(76, 48, 66, 9, 0, 0, 6.2832); g.fill();
+    g.fillStyle = "#ffffff";
+    [[34, 38, 20], [62, 28, 26], [94, 32, 22], [118, 40, 16], [76, 42, 28]].forEach(function (b) { g.beginPath(); g.arc(b[0], b[1], b[2], 0, 6.2832); g.fill(); });
+    g.fillRect(30, 38, 92, 16);
     return c;
   }
 
@@ -151,21 +186,25 @@
   }
 
   function layout() {
-    pY = H * 0.80; hy = H * 0.21;
+    pY = Math.min(H * 0.80, H - 196); hy = H * 0.22;
     y0 = (hy - RT * pY) / (1 - RT);
     rB = (H - y0) / (pY - y0);
     skyGrad = ctx.createLinearGradient(0, 0, 0, hy);
-    skyGrad.addColorStop(0, "#07131f"); skyGrad.addColorStop(0.65, "#0f3340"); skyGrad.addColorStop(1, "#1c6a66");
+    skyGrad.addColorStop(0, "#6ec1ff"); skyGrad.addColorStop(0.6, "#a9dcff"); skyGrad.addColorStop(1, "#e4f5ff");
     groundGrad = ctx.createLinearGradient(0, hy, 0, H);
-    groundGrad.addColorStop(0, "#0b1f24"); groundGrad.addColorStop(1, "#08141a");
+    groundGrad.addColorStop(0, "#a6eb8c"); groundGrad.addColorStop(1, "#5cc24a");
     roadGrad = ctx.createLinearGradient(0, hy, 0, H);
-    roadGrad.addColorStop(0, "#1f3445"); roadGrad.addColorStop(1, "#16252f");
-    glowTeal = makeGlow("0,193,160", 128); glowGold = makeGlow("255,194,75", 64); glowGreen = makeGlow("33,160,56", 96);
-    skyFar = makeSkyline(W * 1.3, hy * 0.62, 7, "#123a46", "", false);
-    skyNear = makeSkyline(W * 1.3, hy * 0.46, 29, "#0a2230", "rgba(255,214,120,0.85)", true);
-    stars = [];
+    roadGrad.addColorStop(0, "#eef2ff"); roadGrad.addColorStop(1, "#ffffff");
+    glowSun = makeGlow("255,248,214", 128); glowGold = makeGlow("255,210,63", 64); glowGreen = makeGlow("34,195,122", 96);
+    townFar = makeTown(W * 1.3, hy * 0.42, 7, 1.6, 0.7);
+    townNear = makeTown(W * 1.3, hy * 0.36, 29, 0.8, 0.95);
+    cloudImg = makeCloud();
+    clouds = [];
     var s = 11;
-    for (var i = 0; i < 26; i++) { s = (s * 16807) % 2147483647; var a = s / 2147483647; s = (s * 16807) % 2147483647; stars.push({ x: a * W, y: (s / 2147483647) * hy * 0.6, ph: i * 1.7 }); }
+    for (var i = 0; i < 5; i++) {
+      s = (s * 16807) % 2147483647; var a = s / 2147483647; s = (s * 16807) % 2147483647; var b = s / 2147483647;
+      clouds.push({ x: a * W * 1.2 - W * 0.1, y: 8 + b * hy * 0.45, k: 0.45 + b * 0.5, v: 4 + a * 6 });
+    }
   }
 
   // ---------- Загрузка контента ----------
@@ -241,7 +280,7 @@
     while ((s === lastSituation || (lastSituation && s.pattern !== "safe" && s.pattern === lastSituation.pattern)) && guard++ < 8) s = list[(rng() * list.length) | 0];
     lastSituation = s;
     var lane = actionLaneById[s.answer];
-    ctx.font = "700 15.5px " + FONT;
+    ctx.font = "800 15.5px " + FONT;
     cards.push({
       icon: s.icon, text: s.text, why: s.why, answer: s.answer, pattern: s.pattern, lines: wrapLines(s.text, cardW() - 16),
       answerLane: lane, isTrap: s.answer !== "ok",
@@ -252,10 +291,11 @@
   function cardH() { return 108; }
 
   // ---------- Ввод ----------
-  function move(dir) {
+  function move(dir) { setLane(player.lane + dir); }
+  function setLane(n) {
     if (state !== "run") return;
     var prev = player.lane;
-    player.lane = clamp(player.lane + dir, 0, LANES - 1);
+    player.lane = clamp(n, 0, LANES - 1);
     player.targetX = laneX(player.lane);
     if (player.lane !== prev) { squashT = 0.2; spawnDust(); syncLegend(); Sound.swish(); }
   }
@@ -268,18 +308,25 @@
       if (e.key === "ArrowLeft" || e.key === "a") move(-1);
       else if (e.key === "ArrowRight" || e.key === "d") move(1);
     });
-    var sx = 0, sy = 0, swiping = false;
+    // кнопки внизу: тап = сразу на эту дорожку
+    var lbs = document.querySelectorAll("#lane-legend .lane-btn");
+    for (var li = 0; li < lbs.length; li++) (function (n) {
+      lbs[n].addEventListener("pointerdown", function (e) { e.preventDefault(); setLane(n); });
+    })(li);
+    var sx = 0, sy = 0, swiping = false, lastTouch = 0;
     cv.addEventListener("touchstart", function (e) {
       var t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; swiping = true;
     }, { passive: true });
     cv.addEventListener("touchend", function (e) {
-      if (!swiping) return; swiping = false;
+      if (!swiping) return; swiping = false; lastTouch = Date.now();
       var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
       if (Math.abs(dx) > 24 && Math.abs(dx) > Math.abs(dy)) { move(dx > 0 ? 1 : -1); }
       else if (Math.abs(dx) < 16 && Math.abs(dy) < 16) { move(t.clientX < W / 2 ? -1 : 1); } // тап по стороне
     }, { passive: true });
     // мышь — для теста в браузере
     cv.addEventListener("mousedown", function (e) {
+      // после тапа браузер шлёт эмулированный mousedown — без этой проверки тап сдвигал героя на 2 дорожки
+      if (Date.now() - lastTouch < 700) return;
       if (state === "run") move(e.clientX < W / 2 ? -1 : 1);
     });
   }
@@ -338,7 +385,7 @@
   function spawnDust() {
     if (REDUCED) return;
     var y = playerY() + 34;
-    for (var i = 0; i < 5; i++) addParticle(player.x, y, (Math.random() - 0.5) * 90, -Math.random() * 40, 0.35, 3 + Math.random() * 3, "rgba(255,255,255,0.5)", 120);
+    for (var i = 0; i < 5; i++) addParticle(player.x, y, (Math.random() - 0.5) * 90, -Math.random() * 40, 0.35, 3 + Math.random() * 3, "rgba(35,36,106,0.22)", 120);
   }
   function updateFx(dt) {
     var i, p;
@@ -375,8 +422,9 @@
       var k = 1 - f.life / f.max, sc = k < 0.15 ? easeOutBack(k / 0.15) : 1;
       ctx.globalAlpha = f.life / f.max > 0.35 ? 1 : f.life / f.max / 0.35;
       ctx.font = "900 " + Math.round(f.size * sc) + "px " + FONT;
-      ctx.lineWidth = 5; ctx.strokeStyle = "rgba(8,18,28,0.75)"; ctx.lineJoin = "round";
-      ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+      ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.lineJoin = "round";
+      var hw = ctx.measureText(f.text).width / 2 + 8, fx = clamp(f.x, hw, W - hw);   // не обрезаем у края экрана
+      ctx.strokeText(f.text, fx, f.y); ctx.fillStyle = f.color; ctx.fillText(f.text, fx, f.y);
     }
     ctx.globalAlpha = 1;
   }
@@ -428,7 +476,7 @@
       shake(10); vignetteT = 0.5; squashT = 0.22; hurtT = 0.55;
       laneHint[c.answerLane] = 1.6;
       spawnBurst(player.x, hy2 - 30, "#ff5a5f"); spawnBurst(player.x, hy2, "#ff8a8e");
-      addFloat(player.x, hy2 - 62, hadCombo ? "Серия прервана" : "Ой!", "#ff8a8e", 22);
+      addFloat(player.x, hy2 - 62, hadCombo ? "Серия прервана" : "Ой!", "#ff7a92", 22);
       showFlash(c);
       if (lives <= 0) { ending = true; endTimer = 2.0; }
     }
@@ -647,31 +695,26 @@
   function drawRoad() {
     var i, j, r, y, N, ph, fl, u = roadScroll / pY;
 
-    // небо
+    // небо, солнце, облака
     ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, hy + 1);
-    ctx.fillStyle = "#cfeee6";
-    for (i = 0; i < stars.length; i++) {
-      ctx.globalAlpha = REDUCED ? 0.5 : 0.35 + 0.35 * Math.sin(tAnim * 1.6 + stars[i].ph);
-      ctx.fillRect(stars[i].x, stars[i].y, 2, 2);
-    }
-    ctx.globalAlpha = 0.85;
-    ctx.drawImage(glowTeal, W / 2 - W * 0.8, hy - W * 0.5, W * 1.6, W * 0.9);
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(glowSun, W * 0.55, -W * 0.3, W * 0.8, W * 0.8);
     ctx.globalAlpha = 1;
-    // параллакс-слои города: реагируют на положение героя
+    for (i = 0; i < clouds.length; i++) {
+      var cl = clouds[i], cw = 150 * cl.k, chh = 60 * cl.k;
+      var cx = ((cl.x + (REDUCED ? 0 : tAnim * cl.v)) % (W + cw * 2)) - cw;
+      ctx.drawImage(cloudImg, cx, cl.y, cw, chh);
+    }
+    // городок с параллаксом (реагирует на положение героя)
     var off = REDUCED ? 0 : (player.x - W / 2);
-    var fw = W * 1.3, farH = hy * 0.62, nearH = hy * 0.46;
-    ctx.drawImage(skyFar, -W * 0.15 - off * 0.05, hy - farH, fw, farH);
-    ctx.drawImage(skyNear, -W * 0.15 - off * 0.12, hy - nearH, fw, nearH);
+    var fw = W * 1.3, farH = hy * 0.42, nearH = hy * 0.36;
+    ctx.drawImage(townFar, -W * 0.15 - off * 0.05, hy - farH + 2, fw, farH);
+    ctx.drawImage(townNear, -W * 0.15 - off * 0.12, hy - nearH + 3, fw, nearH);
 
-    // земля + дорога
+    // трава с полосами «стрижки»
     ctx.fillStyle = groundGrad; ctx.fillRect(0, hy, W, H - hy);
-    var tl = W / 2 - (W / 2) * RT, tr = W / 2 + (W / 2) * RT, bl = W / 2 - (W / 2) * rB, br = W / 2 + (W / 2) * rB;
-    ctx.fillStyle = roadGrad;
-    ctx.beginPath(); ctx.moveTo(tl, hy); ctx.lineTo(tr, hy); ctx.lineTo(br, H); ctx.lineTo(bl, H); ctx.closePath(); ctx.fill();
-
-    // полосы-«шпалы» в перспективе — главный источник ощущения скорости
     N = 8; ph = (u * N) % 1; fl = Math.floor(u * N);
-    ctx.fillStyle = "rgba(255,255,255,0.035)";
+    ctx.fillStyle = "rgba(255,255,255,0.13)";
     for (i = 0; i <= N; i++) {
       if (((i - fl) & 1) === 0) continue;
       var pa = clamp((i - 1 + ph) / N, 0, 1.3), pb = clamp((i + ph) / N, 0, 1.3);
@@ -679,12 +722,35 @@
       if (yb > ya && ya < H) ctx.fillRect(0, ya, W, Math.min(yb, H) - ya + 1);
     }
 
-    // дорожки: подсветка цветом действия (активная ярче) + вспышки
+    // бордюры дороги — «пластиковый» объём: светлый верх + тёмный бок
+    var tl = W / 2 - (W / 2) * RT, tr = W / 2 + (W / 2) * RT, bl = W / 2 - (W / 2) * rB, br = W / 2 + (W / 2) * rB;
+    var cT = 7 * RT, cB = 7 * rB, gold = feverGlow > 0.05;
+    ctx.fillStyle = gold ? "#e0a800" : "#c3cde6";
+    ctx.beginPath(); ctx.moveTo(tl - cT * 2.2, hy); ctx.lineTo(tl, hy); ctx.lineTo(bl, H); ctx.lineTo(bl - cB * 2.2, H); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tr, hy); ctx.lineTo(tr + cT * 2.2, hy); ctx.lineTo(br + cB * 2.2, H); ctx.lineTo(br, H); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = gold ? "#ffd23f" : "#ffffff";
+    ctx.beginPath(); ctx.moveTo(tl - cT * 2.2, hy); ctx.lineTo(tl - cT * 0.6, hy); ctx.lineTo(bl - cB * 0.6, H); ctx.lineTo(bl - cB * 2.2, H); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tr + cT * 0.6, hy); ctx.lineTo(tr + cT * 2.2, hy); ctx.lineTo(br + cB * 2.2, H); ctx.lineTo(br + cB * 0.6, H); ctx.closePath(); ctx.fill();
+
+    // полотно дороги
+    ctx.fillStyle = roadGrad;
+    ctx.beginPath(); ctx.moveTo(tl, hy); ctx.lineTo(tr, hy); ctx.lineTo(br, H); ctx.lineTo(bl, H); ctx.closePath(); ctx.fill();
+
+    // плитка: поперечные швы в перспективе — ощущение скорости
+    N = 12; ph = (u * N) % 1;
+    ctx.fillStyle = "rgba(35,36,106,0.07)";
+    for (i = 0; i <= N + 2; i++) {
+      var pt = (i - 1 + ph) / N; if (pt < 0) continue; if (pt > 1.3) break;
+      var rt = rOf(pt), yt = yOf(rt); if (yt > H) break;
+      ctx.fillRect(sxAt(0, rt), yt, (W) * rt, Math.max(1, 2.2 * rt));
+    }
+
+    // дорожки: мягкая подсветка цветом действия (активная ярче) + вспышки
     for (i = 0; i < LANES; i++) {
       var active = i === player.lane && state === "run";
-      var a = active ? 0.17 : 0.06;
-      if (laneFlash[i] > 0) a += laneFlash[i] * 0.5;
-      if (laneHint[i] > 0) a += (0.18 + 0.18 * Math.sin(tAnim * 18)) * Math.min(1, laneHint[i]);
+      var a = active ? 0.16 : 0.06;
+      if (laneFlash[i] > 0) a += laneFlash[i] * 0.45;
+      if (laneHint[i] > 0) a += (0.16 + 0.16 * Math.sin(tAnim * 18)) * Math.min(1, laneHint[i]);
       var x0 = W * i / LANES, x1 = W * (i + 1) / LANES;
       ctx.fillStyle = "rgba(" + LANE_RGB[i] + "," + a + ")";
       ctx.beginPath();
@@ -692,18 +758,9 @@
       ctx.lineTo(sxAt(x1, rB) - 2, H); ctx.lineTo(sxAt(x0, rB) + 2, H); ctx.closePath(); ctx.fill();
     }
 
-    // неоновые края дороги (золотые при серии)
-    var edgeCol = feverGlow > 0.02 ? "rgba(255,194,75," + (0.55 + feverGlow * 0.4) + ")" : "rgba(0,193,160,0.55)";
-    ctx.strokeStyle = edgeCol; ctx.lineWidth = 3 + feverGlow * 2;
-    ctx.beginPath(); ctx.moveTo(tl, hy); ctx.lineTo(bl, H); ctx.moveTo(tr, hy); ctx.lineTo(br, H); ctx.stroke();
-    if (feverGlow > 0.05) {
-      ctx.strokeStyle = "rgba(255,194,75," + feverGlow * 0.16 + ")"; ctx.lineWidth = 12;
-      ctx.beginPath(); ctx.moveTo(tl, hy); ctx.lineTo(bl, H); ctx.moveTo(tr, hy); ctx.lineTo(br, H); ctx.stroke();
-    }
-
-    // разделители-пунктир: трапеции, сходящиеся к горизонту
+    // разделители-пунктир
     N = 9; ph = (u * N) % 1;
-    ctx.fillStyle = "rgba(255,255,255,0.32)";
+    ctx.fillStyle = "rgba(115,80,255,0.28)";
     ctx.beginPath();
     for (i = 0; i <= N + 3; i++) {
       var pd = (i - 1 + ph) / N, pe = pd + 0.5 / N;
@@ -712,65 +769,69 @@
       var ra = rOf(pd), rb = rOf(pe), ya2 = yOf(ra), yb2 = yOf(rb);
       if (ya2 >= H) break;
       for (j = 1; j < LANES; j++) {
-        var xb = W * j / LANES, wa = 1.6 * ra, wb = 1.6 * rb;
+        var xb = W * j / LANES, wa = 2 * ra, wb = 2 * rb;
         ctx.moveTo(sxAt(xb, ra) - wa, ya2); ctx.lineTo(sxAt(xb, ra) + wa, ya2);
         ctx.lineTo(sxAt(xb, rb) + wb, yb2); ctx.lineTo(sxAt(xb, rb) - wb, yb2); ctx.closePath();
       }
     }
     ctx.fill();
 
-    // стрелки-шевроны в цвет дорожек (бегут к герою, ярче в нижней трети)
+    // стрелки-шевроны в цвет дорожек
     N = 5; ph = (u * N + 0.5) % 1;
     ctx.lineJoin = "round"; ctx.lineCap = "round";
     for (j = 0; j < LANES; j++) {
-      ctx.strokeStyle = "rgba(" + LANE_RGB[j] + ",0.5)";
+      ctx.strokeStyle = "rgba(" + LANE_RGB[j] + ",0.38)";
       ctx.beginPath();
       var cxb = W * (j + 0.5) / LANES;
       for (i = 0; i <= N + 1; i++) {
         var pc = (i - 1 + ph) / N; if (pc < 0.05) continue; if (pc > 1.22) break;
-        var rc = rOf(pc), yc = yOf(rc), sz = 15 * rc, cx2 = sxAt(cxb, rc);
+        var rc = rOf(pc), yc = yOf(rc), sz = 14 * rc, cx2 = sxAt(cxb, rc);
         if (yc > H - 4) break;
         ctx.moveTo(cx2 - sz, yc + sz * 0.5); ctx.lineTo(cx2, yc - sz * 0.5); ctx.lineTo(cx2 + sz, yc + sz * 0.5);
       }
-      ctx.lineWidth = 3.5;
+      ctx.lineWidth = 4;
       ctx.stroke();
     }
 
-    // линия решения — «сканер» на уровне героя
-    ctx.fillStyle = "rgba(255,255,255," + (0.07 + 0.05 * Math.sin(tAnim * 5)) + ")";
+    // линия решения на уровне героя
+    ctx.fillStyle = "rgba(115,80,255," + (0.1 + 0.06 * Math.sin(tAnim * 5)) + ")";
     ctx.fillRect(sxAt(0, 1), pY + 31, W, 3);
 
-    // придорожные фонари и кусты (двигаются синхронно с карточками)
+    // придорожные деревья и кусты (двигаются синхронно с карточками)
     N = 7; ph = (u * N) % 1; fl = Math.floor(u * N);
     for (i = 0; i <= N; i++) {
       var pp = (i + ph) / N; if (pp > 1.28) break;
       r = rOf(pp); y = yOf(r);
-      var lamp = ((i - fl) & 1) === 0;
+      var tree = ((i - fl) & 1) === 0;
       for (j = -1; j <= 1; j += 2) {
-        var ox = W / 2 + j * W * 0.6 * r;
-        if (lamp) {
-          ctx.strokeStyle = "#0a1820"; ctx.lineWidth = Math.max(1.5, 4 * r);
-          ctx.beginPath(); ctx.moveTo(ox, y); ctx.lineTo(ox, y - 78 * r); ctx.lineTo(ox - j * 14 * r, y - 84 * r); ctx.stroke();
-          var g = 30 * r;
-          ctx.globalAlpha = 0.9;
-          ctx.drawImage(glowGold, ox - j * 14 * r - g, y - 84 * r - g, g * 2, g * 2);
-          ctx.globalAlpha = 1;
+        var ox = W / 2 + j * W * 0.62 * r;
+        ctx.fillStyle = "rgba(35,90,40,0.18)";
+        ctx.beginPath(); ctx.ellipse(ox, y, 22 * r, 7 * r, 0, 0, 6.2832); ctx.fill();
+        if (tree) {
+          ctx.fillStyle = "#b07a4f"; ctx.fillRect(ox - 3.5 * r, y - 30 * r, 7 * r, 30 * r);
+          var tr2 = 24 * r, ty = y - 44 * r;
+          var tg = ctx.createRadialGradient(ox - tr2 * 0.35, ty - tr2 * 0.4, 1, ox, ty, tr2 * 1.05);
+          tg.addColorStop(0, "#a4f287"); tg.addColorStop(1, "#3fae3a");
+          ctx.fillStyle = tg; ctx.beginPath(); ctx.arc(ox, ty, tr2, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = "rgba(255,255,255,0.35)"; ctx.beginPath(); ctx.ellipse(ox - tr2 * 0.35, ty - tr2 * 0.45, tr2 * 0.32, tr2 * 0.18, -0.5, 0, 6.2832); ctx.fill();
         } else {
-          ctx.fillStyle = "#0c3a2c";
-          ctx.beginPath(); ctx.ellipse(ox, y - 10 * r, 30 * r, 22 * r, 0, 0, 6.2832); ctx.fill();
-          ctx.fillStyle = "#14633f";
-          ctx.beginPath(); ctx.ellipse(ox - 4 * r, y - 16 * r, 20 * r, 14 * r, 0, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = "#4cb848";
+          ctx.beginPath(); ctx.ellipse(ox, y - 12 * r, 26 * r, 15 * r, 0, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = "#7ddb62";
+          ctx.beginPath(); ctx.ellipse(ox - 5 * r, y - 18 * r, 16 * r, 9 * r, 0, 0, 6.2832); ctx.fill();
+          ctx.fillStyle = j < 0 ? "#ff7a92" : "#ffd23f";
+          ctx.beginPath(); ctx.arc(ox + 9 * r, y - 17 * r, 3.2 * r, 0, 6.2832); ctx.fill();
         }
       }
     }
 
-    // скоростные линии, разлетающиеся от горизонта
+    // лёгкие скоростные линии от горизонта
     if (state === "run" && !REDUCED) {
       var spd = clamp((speed - diff.startSpeed) / (diff.maxSpeed - diff.startSpeed), 0, 1);
-      ctx.strokeStyle = "rgba(255,255,255," + (0.12 + spd * 0.2) + ")";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(255,255,255," + (0.18 + spd * 0.25) + ")";
+      ctx.lineWidth = 2.5;
       ctx.beginPath();
-      var cnt = 9 + Math.round(spd * 3), L = H * 1.1, vy = hy - 4;
+      var cnt = 8 + Math.round(spd * 3), L = H * 1.1, vy = hy - 4;
       for (i = 0; i < cnt; i++) {
         var t = (i * 0.0833 + u * 2.4) % 1, d1 = t * t * L, d2 = d1 + 10 + t * (50 + spd * 80);
         var ca = Math.cos(streakAng[i]), sa2 = Math.sin(streakAng[i]);
@@ -813,25 +874,27 @@
       }
     }
     if (alpha <= 0.01) return;
+    var half = (w / 2) * s * pop + 6;              // карточка не вылезает за край экрана
+    sx = clamp(sx, half, W - half);
     var x = -w / 2, y = -h;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(sx, sy - lift);
     ctx.scale(s * pop, s * pop);
     // тень на дороге
-    ctx.fillStyle = "rgba(0,0,0,0.30)";
-    ctx.beginPath(); ctx.ellipse(0, 10, w * 0.42, 7, 0, 0, 6.2832); ctx.fill();
-    // фон карточки нейтральный (чтобы ребёнок читал текст, а не цвет)
-    ctx.fillStyle = "rgba(0,0,0,0.22)";
-    roundRect(x + 2, y + 6, w, h, 14); ctx.fill();
+    ctx.fillStyle = "rgba(35,36,106,0.16)";
+    ctx.beginPath(); ctx.ellipse(0, 12, w * 0.42, 7, 0, 0, 6.2832); ctx.fill();
+    // фон карточки нейтральный (чтобы ребёнок читал текст, а не цвет): белая наклейка с «пластиковым» низом
+    ctx.fillStyle = "#cdd8ee";
+    roundRect(x, y + 5, w, h, 18); ctx.fill();
     ctx.fillStyle = "#ffffff";
-    roundRect(x, y, w, h, 14); ctx.fill();
+    roundRect(x, y, w, h, 18); ctx.fill();
     // «хвостик» сообщения
     ctx.beginPath(); ctx.moveTo(-9, 0); ctx.lineTo(0, 9); ctx.lineTo(9, 0); ctx.closePath(); ctx.fill();
-    var border = "rgba(0,0,0,0.10)";
-    if (c.flashT > 0) border = c.result === "ok" ? "rgba(33,160,56,0.95)" : "rgba(229,72,77,0.95)";
+    var border = "rgba(35,36,106,0.06)";
+    if (c.flashT > 0) border = c.result === "ok" ? "rgba(34,195,122,0.95)" : "rgba(255,77,109,0.95)";
     ctx.lineWidth = c.flashT > 0 ? 3.5 : 1.5; ctx.strokeStyle = border;
-    roundRect(x, y, w, h, 14); ctx.stroke();
+    roundRect(x, y, w, h, 18); ctx.stroke();
 
     // иконка
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -839,8 +902,8 @@
     ctx.fillStyle = "#000";
     ctx.fillText(c.icon, 0, y + 25);
     // текст (перенос предвычислен при появлении)
-    ctx.fillStyle = "#0e1a12";
-    ctx.font = "700 15.5px " + FONT;
+    ctx.fillStyle = INK;
+    ctx.font = "800 15.5px " + FONT;
     for (var i = 0; i < c.lines.length; i++) ctx.fillText(c.lines[i], 0, y + 54 + i * 18);
 
     // штамп результата (после решения)
@@ -848,7 +911,7 @@
       var st = easeOutBack(clamp((0.5 - c.removeTimer) / 0.2 + 0.2, 0, 1));
       var bx = w / 2 - 6, by = y + 6;
       ctx.save(); ctx.translate(bx, by); ctx.scale(st, st);
-      ctx.fillStyle = c.result === "ok" ? "#21a038" : "#e5484d";
+      ctx.fillStyle = c.result === "ok" ? "#22c37a" : "#ff4d6d";
       ctx.beginPath(); ctx.arc(0, 0, 13, 0, 6.2832); ctx.fill();
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 3.2; ctx.lineCap = "round"; ctx.lineJoin = "round";
       ctx.beginPath();
@@ -888,7 +951,7 @@
     var gy = playerY() + 36;
     ctx.fillStyle = "rgba(" + LANE_RGB[player.lane] + "," + (0.28 + 0.1 * Math.sin(tAnim * 6)) + ")";
     ctx.beginPath(); ctx.ellipse(x, gy, 34 - air * 8, 11 - air * 3, 0, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = "rgba(0,0,0," + (0.35 - air * 0.15) + ")";
+    ctx.fillStyle = "rgba(35,36,106," + (0.22 - air * 0.1) + ")";
     ctx.beginPath(); ctx.ellipse(x, gy, 22 - air * 6 + sq * 4, 7 - air * 2, 0, 0, 6.2832); ctx.fill();
 
     // шлейф-призраки при смене дорожки
@@ -902,7 +965,7 @@
     ghostX[2] = ghostX[1]; ghostX[1] = ghostX[0]; ghostX[0] = x;
 
     // аура
-    ctx.globalAlpha = 0.55 + 0.2 * feverGlow;
+    ctx.globalAlpha = 0.18 + 0.4 * feverGlow;
     var ag = 58 + feverGlow * 10;
     ctx.drawImage(feverGlow > 0.5 ? glowGold : glowGreen, x - ag, y - ag, ag * 2, ag * 2);
     ctx.globalAlpha = 1;
@@ -916,7 +979,7 @@
     ctx.lineCap = "round";
     for (var lg = -1; lg <= 1; lg += 2) {
       var ph2 = lg === -1 ? sw : -sw, ly = 31 + ph2 * 4.5 - air * 4;
-      ctx.strokeStyle = "#0e2a33"; ctx.lineWidth = 6;
+      ctx.strokeStyle = INK; ctx.lineWidth = 6;
       ctx.beginPath(); ctx.moveTo(lg * 9, 22); ctx.lineTo(lg * 9, ly); ctx.stroke();
       ctx.fillStyle = "#ffc24b";
       ctx.beginPath(); ctx.ellipse(lg * 9 + lg * 1.5, ly + 3, 7.5, 4.6, 0, 0, 6.2832); ctx.fill();
@@ -932,15 +995,16 @@
       ctx.closePath(); ctx.fill();
     }
     // руки (взмах в противофазе с ногами)
-    ctx.fillStyle = "#e8fff2";
-    ctx.beginPath(); ctx.arc(-26, 4 + sw * 5 - air * 8, 5, 0, 6.2832); ctx.fill();
-    ctx.beginPath(); ctx.arc(26, 4 - sw * 5 - air * 8, 5, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(-26, 4 + sw * 5 - air * 8, 5, 0, 6.2832); ctx.stroke(); ctx.fill();
+    ctx.beginPath(); ctx.arc(26, 4 - sw * 5 - air * 8, 5, 0, 6.2832); ctx.stroke(); ctx.fill();
 
     // тело-щит: фирменный зелёный градиент
     var gr = ctx.createLinearGradient(-22, -28, 22, 28);
     gr.addColorStop(0, "#2bbf4a"); gr.addColorStop(0.55, "#21a038"); gr.addColorStop(1, "#00b49a");
-    shieldPath(); ctx.fillStyle = gr; ctx.fill();
-    ctx.lineWidth = 3; ctx.strokeStyle = "#eafff0"; ctx.stroke();
+    shieldPath(); ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.lineJoin = "round"; ctx.stroke();
+    ctx.fillStyle = gr; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = "#ffffff"; ctx.stroke();
     // блик
     ctx.fillStyle = "rgba(255,255,255,0.18)";
     ctx.beginPath(); ctx.ellipse(-9, -16, 8, 4, -0.5, 0, 6.2832); ctx.fill();
