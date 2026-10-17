@@ -1,0 +1,85 @@
+/* Компактные предметные события в светлой палитре matvey-v2. */
+.event-stage { position:absolute; z-index:4; top:calc(env(safe-area-inset-top) + 60px); left:50%; width:min(352px, calc(100% - 24px)); transform:translateX(-50%); pointer-events:none; color:#effff8; font-family:inherit; }
+.ev-shell { position:relative; border:1px solid #358573; border-radius:18px; background:linear-gradient(130deg,rgba(17,49,53,.98),rgba(9,28,38,.98)); box-shadow:0 8px 24px #030e1655,inset 0 1px #bbffde12; animation:ev-arrive .32s ease-out both; }
+.ev-scene { display:flex; align-items:center; gap:12px; padding:13px 14px 13px 10px; min-height:108px; }
+.ev-art { width:68px; height:76px; flex:none; position:relative; display:grid; place-items:center; color:#94edd5; }
+.ev-art:before { content:""; position:absolute; width:66px; height:66px; border-radius:50%; background:radial-gradient(circle,#00c1a01f,transparent 72%); }
+.ev-copy { min-width:0; flex:1; }
+.ev-eyebrow { color:#83cdbb; font-size:10px; line-height:1.25; text-transform:uppercase; font-weight:750; letter-spacing:1px; }
+.ev-sender { color:#adbfca; font-size:11px; line-height:1.25; margin-top:3px; overflow-wrap:anywhere; }
+.ev-words { margin:6px 0 0; font-size:16px; line-height:1.3; font-weight:750; overflow-wrap:anywhere; }
+.ev-icon { display:block; width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.ev-timing { padding:7px 9px 0; display:flex; gap:8px; align-items:center; }
+.ev-timing>div { height:3px; flex:1; overflow:hidden; border-radius:3px; background:#8affd326; }
+.ev-timing span { display:block; height:100%; background:#77e3bb; transform-origin:left; }
+.ev-timing small { font-size:10px; color:#c1d6d7; text-shadow:0 1px 3px #001b22; }
+.ev-result { position:absolute; inset:0; border-radius:inherit; background:#103d35ed; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800; font-size:15px; color:#b2f6cd; }
+.ev-result[hidden] { display:none; }
+.ev-miss .ev-result { background:#3a3020ed; color:#ffe0a0; }
+.ev-phone { width:39px; height:68px; position:relative; z-index:1; border:2px solid #88b5b1; border-radius:10px; background:linear-gradient(145deg,#244b52,#102c38); box-shadow:3px 4px #061921; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; animation:ev-wiggle 2.4s ease-in-out infinite; }
+.ev-speaker { position:absolute; top:4px; width:13px; height:2px; border-radius:2px; background:#78a29f; }
+.ev-avatar { display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:#a2f3d51a; }
+.ev-avatar .ev-icon { width:20px; height:20px; }
+.ev-receiver { background:#21a038; padding:3px; border-radius:50%; }
+.ev-receiver .ev-icon { width:10px; height:10px; color:#d8ffe6; }
+.ev-ring { position:absolute; border:1px solid #56ccb2; border-radius:22px; width:44px; height:58px; opacity:0; animation:ev-ring 2.4s ease-out infinite; }
+.ev-ring.r2 { animation-delay:.35s; }
+.ev-chat-back { width:39px; height:29px; position:absolute; left:7px; top:14px; border-radius:9px 9px 9px 2px; background:#274853; border:1px solid #608c96; }
+.ev-chat-front { position:relative; width:48px; height:37px; margin:16px 0 0 9px; border-radius:10px 10px 3px 10px; background:#195647; border:1px solid #6bd3ac; display:flex; align-items:flex-end; justify-content:center; gap:3px; padding-bottom:6px; animation:ev-message 3s ease-out infinite; }
+.ev-chat-front .ev-icon { width:18px; height:18px; position:absolute; left:7px; top:4px; }
+.ev-chat-front i,.ev-dots i { width:3px; height:3px; border-radius:50%; background:#a8ebd6; animation:ev-dot 1.6s ease-in-out infinite; }
+.ev-chat-front i:nth-of-type(2),.ev-dots i:nth-child(2) { animation-delay:.2s; }
+.ev-chat-front i:nth-of-type(3),.ev-dots i:nth-child(3) { animation-delay:.4s; }
+.ev-laptop { width:57px; height:43px; border:2px solid #709c9b; border-radius:6px 6px 2px 2px; background:#122d38; display:grid; place-items:center; transform-origin:bottom; animation:ev-open .5s ease-out both; }
+.ev-laptop .ev-icon { width:21px; height:21px; }
+.ev-dots { display:flex; gap:5px; margin-bottom:4px; }
+.ev-laptop-base { width:67px; height:5px; background:#749a9b; position:absolute; top:59px; border-radius:2px 2px 7px 7px; }
+.ev-camera-frame { width:64px; height:51px; border:1px dashed #74ac9a; border-radius:10px; display:grid; place-items:center; }
+.ev-bank-card { width:49px; height:32px; position:relative; overflow:hidden; border-radius:5px; color:#c7f5d5; background:linear-gradient(140deg,#2d8547,#175b4c); transform:rotate(-9deg); animation:ev-turn 3.5s ease-in-out infinite; }
+.ev-bank-card .ev-icon { width:44px; height:31px; margin:auto; stroke-width:1.2; }
+.ev-bank-card i { position:absolute; inset:-10px; background:linear-gradient(110deg,transparent 40%,#dbffe355 50%,transparent 60%); animation:ev-shine 3.5s ease-in-out infinite; }
+.ev-gift { width:43px; height:34px; position:relative; margin-top:16px; background:#238755; border:1px solid #81dba7; border-radius:3px; animation:ev-bounce 3s ease-in-out infinite; }
+.ev-gift b { width:8px; height:100%; background:#ffc24b; position:absolute; left:17px; }
+.ev-gift-lid { width:49px; height:10px; border:1px solid #a3e6b6; background:#39a56b; left:-4px; top:-7px; position:absolute; z-index:1; border-radius:3px; animation:ev-lid 3s ease-in-out infinite; }
+.ev-bow { position:absolute; width:24px; height:12px; top:-18px; left:8px; border:3px solid #ffc24b; border-radius:50% 50% 10% 10%; animation:ev-lid 3s ease-in-out infinite; }
+.ev-spark { position:absolute; color:#ffc24b; top:3px; right:3px; animation:ev-dot 2s ease-in-out infinite; }
+.ev-wallet { position:absolute; width:31px; height:29px; display:grid; place-items:center; color:#b5f0ce; border:1px solid #6fb78e; background:#205644; border-radius:6px; font-size:17px; font-weight:700; }
+.ev-wallet.from { left:0; top:10px; }.ev-wallet.to { right:0; bottom:7px; }
+.ev-transfer { z-index:1; background:#143b42; border-radius:50%; padding:3px; animation:ev-transfer 2.5s ease-in-out infinite; }
+.ev-transfer .ev-icon { width:20px; height:20px; color:#ffc24b; }
+.ev-window { width:62px; height:49px; border:1px solid #81aea9; border-radius:6px; background:#193c46; padding-top:15px; display:flex; justify-content:center; position:relative; animation:ev-open .5s ease-out; }
+.ev-window>i { position:absolute; top:0; left:0; right:0; height:10px; border-bottom:1px solid #81aea960; background:radial-gradient(circle at 5px 5px,#7bd4ba 1px,transparent 2px),radial-gradient(circle at 11px 5px,#ffc24b 1px,transparent 2px); }
+.ev-window .ev-icon { animation:ev-dot 3s ease-in-out infinite; }
+.ev-notice { width:52px; height:52px; background:#184b44; border:1px solid #62b29a; border-radius:14px; display:grid; place-items:center; transform:rotate(-7deg); animation:ev-wiggle 3s ease-in-out infinite; }
+.ev-notice .ev-icon { width:29px; height:29px; }.ev-notice i { position:absolute; top:-3px; right:-3px; width:10px; height:10px; border:2px solid #173a3d; background:#ffc24b; border-radius:50%; }
+.ev-big-coin { width:46px; height:46px; color:#ffd477; display:grid; place-items:center; background:#98732b; border:2px solid #ffc24b; border-radius:50%; box-shadow:3px 0 #62491c; animation:ev-coin 2.5s ease-in-out infinite; }
+.ev-big-coin .ev-icon { width:39px; height:39px; }.ev-coin-shadow { position:absolute; width:34px; height:6px; bottom:4px; border-radius:50%; background:#020e1880; }
+@keyframes ev-arrive { from { opacity:0; transform:translateY(-12px) scale(.97); } to { opacity:1; transform:none; } }
+@keyframes ev-wiggle { 0%,12%,24%,100% { transform:rotate(-4deg); } 6%,18% { transform:rotate(6deg); } }
+@keyframes ev-ring { 0% { transform:scale(.8); opacity:.55; } 65%,100% { transform:scale(1.5); opacity:0; } }
+@keyframes ev-message { 0% { transform:translateY(9px); opacity:.3; } 16%,100% { transform:none; opacity:1; } }
+@keyframes ev-dot { 0%,70%,100% { opacity:.5; } 35% { opacity:1; } }
+@keyframes ev-open { from { transform:perspective(180px) rotateX(-60deg); opacity:.3; } to { transform:none; opacity:1; } }
+@keyframes ev-turn { 0%,100% { transform:rotate(-9deg); } 50% { transform:rotate(3deg); } }
+@keyframes ev-shine { 0%,25% { transform:translateX(-70px); } 65%,100% { transform:translateX(70px); } }
+@keyframes ev-bounce { 0%,50%,100% { transform:translateY(0); } 20% { transform:translateY(-4px); } }
+@keyframes ev-lid { 0%,55%,100% { transform:none; } 22% { transform:translateY(-6px) rotate(-8deg); } }
+@keyframes ev-transfer { 0%,100% { transform:translate(-3px,-3px); } 50% { transform:translate(3px,3px); } }
+@keyframes ev-coin { 0%,100% { transform:translateY(0) rotateY(0); } 50% { transform:translateY(-5px) rotateY(40deg); } }
+@media (max-width:360px) { .ev-scene { gap:8px; padding:11px 12px 11px 8px; }.ev-art { width:60px; }.ev-words { font-size:15px; } }
+@media (prefers-reduced-motion:reduce) { .event-stage * { animation:none !important; }.ev-ring,.ev-bank-card i { display:none; } }
+
+/* Белые карточки-наклейки, фиолетовые предметы; цвет не подсказывает правильный ответ. */
+.event-stage { color:var(--ink,#25204f); top:calc(env(safe-area-inset-top) + 65px); }
+.ev-shell { border:2px solid #fff; background:#fff; border-radius:22px; box-shadow:0 4px 0 #c3cdeb,0 9px 20px #2350a024; }
+.ev-art { color:var(--violet); }.ev-art:before { background:#f1edff; }
+.ev-eyebrow { color:var(--violet-2,#5937d2); }.ev-sender { color:var(--ink-2,#5b5782); }.ev-words { font-weight:850; }
+.ev-timing>div { background:#d5cafa; }.ev-timing span { background:var(--violet,#7350ff); }.ev-timing small { color:var(--ink,#25204f); text-shadow:none; font-weight:750; }
+.ev-result { background:#e3faeaf5; color:#187341; }.ev-miss .ev-result { background:#fff3ccf5; color:#755312; }
+.ev-phone { border-color:#a797e8; background:linear-gradient(#f7f4ff,#e3dcff); box-shadow:3px 4px #8b78cc; }.ev-speaker { background:#a293d3; }.ev-avatar { background:#d6cbff; }.ev-ring { border-color:#9d86fa; }
+.ev-chat-back { background:#e5e9ff; border-color:#a5a7dd; }.ev-chat-front { background:#dfd5ff; border-color:#a88cfa; }.ev-chat-front i,.ev-dots i { background:#957bd4; }
+.ev-laptop { background:#ece6ff; border-color:#b0a0df; }.ev-laptop-base { background:#a99bd3; }.ev-camera-frame { border-color:#b4a2e3; }
+.ev-bank-card { background:linear-gradient(140deg,#46c88b,#179b72); color:#fff; }.ev-gift { background:#977bff; border-color:#b6a2ff; }.ev-gift-lid { background:#b5a0ff; border-color:#ddcfff; }
+.ev-wallet { color:#6e4ec0; border-color:#c5a9ef; background:#eee4ff; }.ev-transfer { background:#fff8dc; }
+.ev-window { background:#ece7ff; border-color:#b7a6e6; }.ev-window>i { border-color:#cfc3ef; background:#dfd5ff; }
+.ev-notice { background:#e8e2ff; border-color:#bda6f4; }.ev-notice i { border-color:#fff; }.ev-big-coin { background:#ffd23f; color:#fff6bb; border-color:#f5b800; box-shadow:3px 0 #d99a00; }.ev-coin-shadow { background:#7760b733; }

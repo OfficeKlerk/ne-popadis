@@ -5,31 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <link rel="icon" href="data:," />
   <title>Не попадись!</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=reel-jump-3" />
+  <link rel="stylesheet" href="events.css?v=reel-jump-3" />
+  <link rel="stylesheet" href="rewards.css?v=reel-jump-3" />
 </head>
 <body>
   <div id="app">
     <!-- Игровое поле -->
-    <canvas id="game"></canvas>
+    <canvas id="game" aria-label="Бег по трём дорожкам. Стрелки влево и вправо — манёвр, вверх или пробел — прыжок."></canvas>
+    <section id="event-stage" class="event-stage hidden" role="status" aria-live="polite" aria-atomic="true"></section>
 
     <!-- HUD во время забега -->
     <div id="hud" class="hud hidden">
       <div class="hud-left">
         <div class="hud-chip" id="distance">0 м</div>
-        <div class="hud-chip coins" id="coins"><span class="coin-dot"></span><span id="coins-n">0</span></div>
+        <div class="hud-chip coins" id="coins"><span class="coin-dot" id="coin-target" aria-hidden="true"></span><span id="coins-n">0</span></div>
       </div>
       <div class="hud-right">
-        <div class="hud-chip combo hidden" id="combo">x2</div>
-        <div class="lives" id="lives"></div>
-        <button class="icon-btn" id="sound-run" aria-label="Звук">🔈</button>
+        <button class="icon-btn" id="sound-run" aria-label="Включить звук"></button>
+        <button class="icon-btn" id="btn-pause" aria-label="Пауза и выход"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="5" height="18" rx="2"/><rect x="14" y="3" width="5" height="18" rx="2"/></svg></button>
       </div>
+      <div class="hud-health"><div class="lives" id="lives" role="status" aria-live="polite" aria-atomic="true"></div><div class="hud-chip combo hidden" id="combo">x2</div></div>
     </div>
 
     <!-- Подсказка действий (нижние дорожки) -->
     <div id="lane-legend" class="lane-legend hidden">
-      <div class="legend-item" data-lane="0"><span class="legend-emoji">🛑</span><span>Отказать</span></div>
-      <div class="legend-item" data-lane="1"><span class="legend-emoji">🔎</span><span>Проверить</span></div>
-      <div class="legend-item" data-lane="2"><span class="legend-emoji">✅</span><span>Можно</span></div>
+      <button class="legend-item lane-btn" data-lane="0" aria-label="Отказать"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span class="lb-label">Отказать</span></button>
+      <button class="legend-item lane-btn" data-lane="1" aria-label="Проверить"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15.2 15.2l4.8 4.8"/></svg></span><span class="lb-label">Проверить</span></button>
+      <button class="legend-item lane-btn" data-lane="2" aria-label="Можно"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="lb-label">Можно</span></button>
     </div>
 
     <!-- Всплывающее «почему» при ошибке -->
@@ -38,57 +41,49 @@
     <!-- Стартовый экран -->
     <section id="screen-start" class="screen">
       <div class="brand">
-        <div class="logo-badge" id="logo-badge">
-          <svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
-            <path d="M32 6c9 5 17 6 22 6v18c0 14-9 24-22 28C19 54 10 44 10 30V12c5 0 13-1 22-6z" fill="#fff" fill-opacity=".95"/>
-            <path d="M32 11c7 4 13 5 17 5v14c0 11-7 19-17 23-10-4-17-12-17-23V16c4 0 10-1 17-5z" fill="#21a038"/>
-            <path d="M23 32l7 7 12-14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-        <h1 class="game-title">Не попадись!</h1>
+        <h1 class="game-title">Не <span class="accent">попадись!</span></h1>
         <p class="subtitle">Распознай ловушку на бегу</p>
       </div>
-
-      <div class="howto">
-        <p class="howto-title">Уводи героя на нужную дорожку:</p>
-        <div class="howto-row r0"><span class="he">🛑</span><b>Отказать</b> — код, пароль, «срочно переведи», приз</div>
-        <div class="howto-row r1"><span class="he">🔎</span><b>Проверить</b> — странная ссылка, «банк» в чате</div>
-        <div class="howto-row r2"><span class="he">✅</span><b>Можно</b> — мама, друг, уведомление в приложении</div>
+      <div class="start-stage" aria-hidden="true"></div>
+      <div class="start-bottom">
+        <p class="start-help">Собирай монеты, обходи ящики,<br>прыгай через барьеры и выбирай безопасный ответ.<br>Свайп вбок — манёвр, вверх — прыжок.</p>
+        <button class="btn-primary" id="btn-play">Играть</button>
+        <label class="sound-toggle">
+          <input type="checkbox" id="sound-toggle" />
+          <span class="pill" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="8" width="4" height="8" rx="1.5"/><path d="M8 8l7-5v18l-7-5z"/><path d="M18 8q4 4 0 8M21 5q6 7 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="sound-lbl">Звуки игры</span>
+        </label>
       </div>
-
-      <button class="btn-primary" id="btn-play">Играть</button>
-
-      <label class="sound-toggle">
-        <input type="checkbox" id="sound-toggle" />
-        <span class="pill" aria-hidden="true"></span>
-        <span class="sound-lbl">Звук</span>
-      </label>
-      <p class="hint">Свайп влево/вправо или нажми на сторону экрана</p>
     </section>
 
     <!-- Экран итога -->
-    <section id="screen-end" class="screen hidden">
-      <h2 class="end-title">Забег окончен!</h2>
-      <div class="stars" id="end-stars"></div>
+    <section id="screen-end" class="screen hidden" aria-labelledby="end-title">
+      <h2 class="end-title" id="end-title">Забег окончен!</h2>
       <div class="end-stats">
         <div class="stat"><div class="stat-num" id="end-distance">0</div><div class="stat-lbl">метров</div></div>
-        <div class="stat"><div class="stat-num" id="end-recognized">0/0</div><div class="stat-lbl">ловушек распознано</div></div>
         <div class="stat"><div class="stat-num" id="end-coins">0</div><div class="stat-lbl">монет</div></div>
+        <div class="stat"><div class="stat-num" id="end-recognized">0</div><div class="stat-lbl">ловушек<br>распознано</div></div>
       </div>
+      <p class="end-verdict" id="end-verdict"></p>
+      <section class="chest-shop" aria-labelledby="shop-title">
+        <div class="shop-heading"><h3 id="shop-title">Выбери сундук</h3><span class="shop-wallet"><i class="coin-dot" aria-hidden="true"></i><span id="shop-balance" aria-live="polite">0</span><span class="sr-only">монет осталось</span></span></div>
+        <div class="chest-list" id="chest-list"></div>
+        <div id="run-collection" class="run-collection hidden"><h4 id="collection-heading">Зверушки забега</h4><div id="run-pets" class="run-pets"></div></div>
+        <p class="shop-note">Монеты и зверушки — до нового забега.</p>
+      </section>
+      <button class="btn-primary" id="btn-again">Начать заново</button>
+    </section>
 
-      <div class="decisions" id="end-decisions"></div>
-      <div class="end-verdict" id="end-verdict"></div>
-
-      <div class="review" id="review">
-        <p class="review-title hidden" id="review-title">Разбор ошибок — нажми, чтобы понять:</p>
-        <div id="review-list"></div>
+    <section id="pause-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="pause-card"><span class="pause-mark" aria-hidden="true">Ⅱ</span><h2 id="pause-title">Передохнём?</h2><p>Забег подождёт тебя.</p>
+        <button class="btn-primary" id="btn-resume">Продолжить</button>
+        <button class="btn-secondary" id="btn-finish-run">Завершить забег</button>
+        <button class="btn-text" id="btn-exit">Выйти из игры</button>
+        <small>При выходе забег и монеты сбросятся.</small>
       </div>
-
-      <div class="end-actions">
-        <button class="btn-primary" id="btn-again">Ещё раз</button>
-        <button class="btn-secondary" id="btn-share">Поделиться</button>
-      </div>
-      <button class="btn-text" id="btn-close">Выйти</button>
+    </section>
+    <section id="reward-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="reward-title">
+      <div class="reward-dialog" id="reward-dialog" tabindex="-1"><h2 id="reward-title">Кто внутри?</h2><div id="reward-opening" class="reward-opening"></div><div id="reward-reel" class="reward-reel hidden"><span class="reel-pointer" aria-hidden="true"></span><div class="reel-window" aria-hidden="true"><div id="reel-track" class="reel-track"></div></div><p id="reel-label" class="reel-label" role="status">Кто станет твоим другом?</p></div><div id="reward-pet" class="hidden" role="status" aria-live="polite"></div><button class="btn-primary hidden" id="btn-reward-done">К сундукам</button></div>
     </section>
 
     <!-- Загрузка -->
@@ -98,6 +93,11 @@
     </section>
   </div>
 
-  <script src="js/game.js"></script>
+  <script src="js/events.js?v=reel-jump-3"></script>
+  <script src="js/runner.js?v=reel-jump-3"></script>
+  <script src="js/city.js?v=reel-jump-3"></script>
+  <script src="js/rewards.js?v=reel-jump-3"></script>
+  <script src="js/reward-shop.js?v=reel-jump-3"></script>
+  <script src="js/game.js?v=reel-jump-3"></script>
 </body>
 </html>

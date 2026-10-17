@@ -1,0 +1,90 @@
+/* Pastel chests, result wallet and locally drawn pets. */
+#screen-end { justify-content:flex-start; gap:14px; padding:28px 16px 24px; overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain; }
+#screen-end>* { flex-shrink:0; }
+#screen-end .end-title { font-size:28px; margin:0; }
+#screen-end .end-stats { gap:8px; max-width:360px; margin:0; }
+#screen-end .stat { min-height:83px; padding:11px 5px; }
+#screen-end .stat-num { font-size:28px; }
+#screen-end .stat-lbl { min-height:24px; font-size:11px; }
+#screen-end .end-verdict { margin:0; min-height:0; font-size:14px; max-width:340px; }
+#screen-end #btn-again { width:100%; max-width:360px; margin:2px 0 0; padding:14px 20px; }
+.chest-shop { width:100%; max-width:410px; padding:13px 10px 10px; border-radius:24px; background:#ffffffdb; box-shadow:var(--card-sh); }
+.shop-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:0 4px; }
+.shop-heading h3 { margin:0; font-size:18px; }
+.shop-wallet { display:flex; align-items:center; gap:5px; padding:5px 9px; border-radius:12px; background:#fff1b8; font-weight:900; font-size:16px; }
+.chest-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin:12px 0; }
+.chest-choice { min-width:0; padding:6px 2px 8px; border:2px solid #ddd5fa; border-radius:17px; background:#f8f5ff; color:var(--ink); display:flex; align-items:center; flex-direction:column; cursor:pointer; box-shadow:0 3px 0 #d7cef0; }
+.chest-choice:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #d7cef0; }
+.chest-choice:disabled { cursor:default; background:#f0f1f8; border-color:#e0e2ed; box-shadow:0 3px 0 #e0e2ed; }
+.chest-choice:disabled .chest-art { filter:saturate(.55); opacity:.7; }
+.chest-name { font-size:11px; font-weight:850; letter-spacing:-.2px; }
+.chest-price { margin-top:6px; display:flex; align-items:center; justify-content:center; gap:5px; min-width:58px; border-radius:10px; padding:4px 9px; background:#ffd954; box-shadow:0 2px 0 #dca626; font-size:17px; font-weight:900; }
+.chest-price .coin-dot { width:13px; height:13px; background:#ffed9c; border:1px solid #b7811f; }
+.chest-choice small { margin-top:6px; font-size:10px; font-weight:750; color:var(--ink-2); }
+.chest-art { --chest-light:#e7a66a; --chest-dark:#986040; --chest-trim:#ffe0a0; display:block; position:relative; width:88px; height:76px; flex:none; }
+.chest-art[data-chest=silver] { --chest-light:#d5e8ff; --chest-dark:#859fc2; --chest-trim:#f2fbff; }
+.chest-art[data-chest=gold] { --chest-light:#ffde67; --chest-dark:#d8972e; --chest-trim:#fff0ad; }
+.chest-base,.chest-lid { position:absolute; left:8px; width:72px; border:3px solid var(--chest-trim); background:linear-gradient(90deg,transparent 17%,#fff5 18%,#fff5 24%,transparent 25%,transparent 74%,#62434325 75%,#62434325 82%,transparent 83%),linear-gradient(var(--chest-light),var(--chest-dark)); box-shadow:0 2px 0 #51406a44; }
+.chest-base { top:41px; height:29px; border-radius:3px 3px 9px 9px; }
+.chest-lid { top:14px; height:30px; border-radius:19px 19px 4px 4px; transform-origin:5% 100%; }
+.chest-lock { position:absolute; top:36px; left:36px; width:16px; height:20px; border:2px solid var(--chest-dark); background:var(--chest-trim); border-radius:5px; }
+.chest-lock::after { content:""; position:absolute; width:4px; height:8px; left:4px; top:4px; border-radius:3px; background:var(--chest-dark); }
+.chest-glow { position:absolute; inset:0; border-radius:50%; background:radial-gradient(ellipse,#fff0bbaa,transparent 65%); }
+.shop-note { margin:7px 0 0; color:var(--ink-2); font-size:10px; font-weight:650; }
+.run-collection { border-top:1px solid #e2def2; margin-top:10px; padding-top:9px; }
+.run-collection h4 { font-size:12px; margin:0 0 6px; text-align:left; }
+.run-pets { display:flex; gap:5px; overflow-x:auto; touch-action:pan-x; padding:0 0 4px; }
+.owned-pet { border:1px solid #e0d6f6; background:#f6f0ff; padding:2px; border-radius:12px; width:54px; min-width:54px; cursor:pointer; }
+.owned-pet svg { width:100%; display:block; }
+.modal-overlay { position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; padding:20px; background:#3d386259; backdrop-filter:blur(5px); overflow-y:auto; touch-action:pan-y; }
+.pause-card,.reward-dialog { width:100%; max-width:360px; max-height:100%; overflow-y:auto; padding:24px 20px; border-radius:28px; background:#f8fbff; box-shadow:0 7px 0 #abafd9,0 16px 40px #28225035; color:var(--ink); text-align:center; }
+.pause-card { display:flex; flex-direction:column; gap:13px; }
+.pause-card h2 { margin:0; font-size:28px; }.pause-card p { margin:0 0 7px; font-size:15px; }
+.pause-mark { color:var(--violet); font-size:46px; font-weight:900; line-height:1; }
+.pause-card .btn-primary { padding:15px 20px; }.pause-card .btn-secondary { background:var(--violet-soft); }
+.pause-card .btn-text { padding:6px; font-size:14px; }.pause-card small { font-size:11px; color:var(--ink-2); }
+.reward-dialog { outline:none; }
+.reward-dialog h2 { margin:0 0 4px; font-size:27px; }
+.pet-art { width:165px; margin:0 auto; background:radial-gradient(ellipse,#e9dcff,transparent 70%); }
+.pet-art svg { width:100%; display:block; }
+.pet-rarity { display:inline-block; background:var(--pet-color); color:var(--ink); padding:4px 11px; border-radius:20px; font-size:12px; font-weight:850; }
+.pet-bio { font-size:13px; line-height:1.45; margin:12px 0; }
+.pet-lesson { padding:12px; border-radius:15px; background:#ece7ff; text-align:left; font-size:13px; line-height:1.5; }
+.pet-lesson strong { color:#5432c3; }.pet-lesson p { margin:5px 0 0; }
+#btn-reward-done { width:100%; margin-top:16px; padding:13px 16px; font-size:18px; }
+.reward-opening { display:flex; justify-content:center; align-items:center; height:240px; }
+.reward-opening .chest-art { transform:scale(2); }
+.reward-opening .chest-lid { animation:openLid .65s ease-in-out both; }
+.reward-opening .chest-lock { animation:unlockChest .65s ease-out both; }
+.reward-opening .chest-glow { animation:chestGlow .65s ease-out both; }
+@keyframes openLid { 0%,25% { transform:rotate(0); } 40% { transform:rotate(-10deg); } 100% { transform:translateY(-8px) rotate(-32deg); } }
+@keyframes unlockChest { 0%,25% { opacity:1; } 50%,100% { opacity:0; transform:translateY(8px); } }
+@keyframes chestGlow { from { opacity:0; transform:scale(.6); } to { opacity:1; transform:scale(2.3); } }
+
+@media(max-width:360px) { .chest-art { transform:scale(.88); margin:-4px -5px; }.chest-list { gap:5px; }.chest-name { font-size:10px; }.modal-overlay { padding:12px; }.reward-dialog { padding:18px 16px; }.pet-art { width:135px; } }
+@media(prefers-reduced-motion:reduce) { .chest-art * { animation:none!important; } }
+
+/* Лента зверушек из update/new_finish в светлой палитре локальной игры. */
+.reward-reel { position:relative; margin:24px -6px 16px; }
+.reel-window { position:relative; overflow:hidden; padding:14px 0; border:2px solid #ddd3fa; border-radius:20px; background:#ece7ff; }
+.reel-window::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#ece7ffdd,transparent 15%,transparent 85%,#ece7ffdd); }
+.reel-track { position:relative; left:50%; display:flex; gap:12px; width:max-content; }
+.spinning .reel-track { will-change:transform; }
+.reel-card { flex:0 0 104px; width:104px; padding:6px 4px 10px; border:2px solid var(--card-color); border-radius:16px; background:#ffffff; color:var(--ink); box-shadow:0 3px 0 #8270b518; }
+.reel-card svg { width:92px; height:88px; display:block; }
+.reel-name { display:block; font-size:12px; font-weight:850; }
+.reel-rarity { display:block; margin-top:5px; font-size:9px; font-weight:700; color:var(--ink-2); }
+.reel-pointer { position:absolute; z-index:2; top:-6px; left:50%; width:20px; height:20px; background:var(--sun); border:3px solid #fff; border-radius:5px; transform:translateX(-50%) rotate(45deg); box-shadow:2px 2px 0 #c79a39; }
+.reel-label { min-height:30px; margin:12px 0 0; font-size:13px; color:var(--ink-2); font-weight:750; }
+.reel-card.winner { border-color:var(--violet); background:#fff5cc; box-shadow:0 0 0 3px #bda8ff,0 4px 10px #7350ff33; }
+.pet-reveal { position:relative; isolation:isolate; margin:12px 0 0; }
+.pet-reveal .pet-art { position:relative; z-index:1; }
+.pet-aura { position:absolute; inset:8px 50%; width:180px; height:150px; margin-left:-90px; border-radius:50%; background:radial-gradient(ellipse,var(--pet-color),transparent 68%); opacity:0; animation:rewardHalo 1.4s ease-out both; pointer-events:none; }
+.reward-burst { position:absolute; z-index:2; left:50%; top:48%; pointer-events:none; }
+.reward-burst i { position:absolute; width:7px; height:11px; border-radius:2px; background:var(--confetti); color:var(--confetti); font-style:normal; animation:rewardConfetti 1.25s ease-out var(--delay) both; opacity:0; }
+.reward-burst i:nth-child(3n+1) { width:14px; height:14px; font-size:22px; line-height:14px; background:none; }
+.celebrating .pet-art { animation:rewardArrival .6s cubic-bezier(.2,.9,.3,1.3) both; }
+@keyframes rewardArrival { from { transform:translateY(20px) rotate(-12deg) scale(.55); opacity:0; } 65% { opacity:1; } to { transform:translateY(0) rotate(0) scale(1); opacity:1; } }
+@keyframes rewardHalo { 0% { opacity:0; transform:scale(.4); } 30% { opacity:.8; } 100% { opacity:0; transform:scale(1.5); } }
+@keyframes rewardConfetti { 0% { opacity:0; transform:translate(0,0) scale(.3); } 12% { opacity:1; } 70% { opacity:1; } 100% { opacity:0; transform:translate(var(--dx),var(--dy)) rotate(var(--turn)) scale(.7); } }
+@media(prefers-reduced-motion:reduce) { .pet-aura,.reward-burst { display:none; }.celebrating .pet-art { animation:none; } }

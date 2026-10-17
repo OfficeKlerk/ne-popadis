@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="data:,">
+  <title>События · Не попадись!</title>
+  <link rel="stylesheet" href="events.css?v=matvey-local-2">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e5f1ff; color: #25204f; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width: 980px; margin: 0 auto; padding: 30px 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 26px; }
+    h1 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.6px; } header p { margin: 0; color: #5b5782; font-size: 13px; }
+    a { color: #5937d2; font-size: 14px; text-decoration: none; }
+    .layout { display: grid; grid-template-columns: minmax(260px,1fr) minmax(290px,380px); gap: 34px; align-items: start; }
+    .layout > section:last-child { position: sticky; top: 20px; }
+    .group-nav { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 18px; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    .group-nav button { border: 1px solid #d1c9ef; background: #ffffff; border-radius: 10px; padding: 9px 11px; font-size: 12px; }
+    .group-nav button[aria-pressed="true"] { background: #ede6ff; color: #5937d2; border-color: #9579f6; }
+    .cards { display: grid; gap: 8px; }
+    .cards button { border: 1px solid #d1c9ef; background: #ffffff; border-radius: 12px; padding: 13px 14px; text-align: left; font-size: 14px; line-height: 1.4; }
+    .cards button[aria-pressed="true"] { border-color: #9579f6; background: #ede6ff; }
+    .cards small { display: block; margin-bottom: 3px; color: #5b5782; font-size: 11px; }
+    .preview { position: relative; min-height: 200px; border: 1px solid #c6d7ef; border-radius: 26px; overflow: hidden; background: radial-gradient(ellipse at 50% 65%,#c6e5ff,transparent 65%),linear-gradient(#a9d5ff,#edf6ff); }
+    .preview::after { content: ""; position: absolute; height: 65px; bottom: 0; left: 0; right: 0; background: repeating-linear-gradient(90deg,transparent 0 36px,#c4d7e518 36px 38px); transform: perspective(100px) rotateX(25deg); }
+    .event-preview { top: 24px; }
+    .event-preview .ev-timing { display: none; }
+    .preview-footer { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-top: 14px; }
+    .replay { background: #ffd23f; color: #25204f; padding: 11px 15px; border: 0; border-radius: 11px; font-size: 13px; font-weight: 650; }
+    label { display: flex; align-items: center; gap: 7px; color: #5b5782; font-size: 13px; }
+    input { accent-color: #7350ff; width: 17px; height: 17px; }
+    #motion { color: #5b5782; font-size: 13px; line-height: 1.6; min-height: 44px; }
+    #answer { padding-top: 14px; border-top: 1px solid #d1c9ef; font-size: 13px; color: #5b5782; line-height: 1.5; }
+    @media(max-width:700px) { main { padding: 20px 16px; } .layout { display: flex; flex-direction: column-reverse; gap: 25px; } .layout > section { width: 100%; } .layout > section:last-child { position: static; } .preview { max-width: 380px; margin: 0 auto; } h1 { font-size: 22px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header><div><h1>События «Не попадись!»</h1><p>19 ситуаций · монеты на дороге</p></div><a href="index.html">К игре →</a></header>
+    <div class="layout">
+      <section aria-label="Выбор события"><nav class="group-nav" aria-label="Группы событий"></nav><div class="cards"></div></section>
+      <section aria-label="Просмотр анимации">
+        <div class="preview"><div id="event-stage" class="event-stage hidden" role="status" aria-live="polite"></div></div>
+        <div class="preview-footer"><button class="replay" type="button">Повторить анимацию</button></div>
+        <p id="motion"></p><p id="answer"></p>
+      </section>
+    </div>
+  </main>
+  <script src="js/events.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      var view = GameEvents.create(document.getElementById("event-stage"), { preview: true });
+      var content, selected = 0, group = "all";
+      var nav = document.querySelector(".group-nav"), list = document.querySelector(".cards");
+      function show(index, reveal) {
+        selected = index;
+        var s = content.situations[index], type = GameEvents.types[s.visual.type];
+        view.show(s);
+        document.getElementById("motion").textContent = type.motion;
+        var action = content.actions.find(function (a) { return a.id === s.answer; });
+        document.getElementById("answer").textContent = s.delivery === "pickup" ? "В игре эта монетка собирается прямо на дороге. Сцена оставлена здесь как образец оформления." : action.label + ". " + s.why;
+        Array.prototype.forEach.call(list.children, function (button) { button.setAttribute("aria-pressed", String(Number(button.dataset.index) === selected)); });
+        if (reveal && window.matchMedia("(max-width: 700px)").matches) document.querySelector(".preview").scrollIntoView({ block: "start" });
+      }
+      function filter(type) {
+        group = type; list.innerHTML = "";
+        Array.prototype.forEach.call(nav.children, function (button) { button.setAttribute("aria-pressed", String(button.dataset.type === group)); });
+        content.situations.forEach(function (s, index) {
+          if (group !== "all" && s.visual.type !== group) return;
+          var button = document.createElement("button"), label = document.createElement("small");
+          button.type = "button"; button.dataset.index = index; button.setAttribute("aria-pressed", String(index === selected));
+          label.textContent = GameEvents.types[s.visual.type].label;
+          button.appendChild(label); button.appendChild(document.createTextNode(s.text));
+          button.addEventListener("click", function () { show(index, true); }); list.appendChild(button);
+        });
+        if (group !== "all" && content.situations[selected].visual.type !== group) show(Number(list.firstElementChild.dataset.index), true);
+      }
+      fetch("content.json", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("Контент не загружен"); return r.json(); }).then(function (data) {
+        content = data;
+        ["all"].concat(Object.keys(GameEvents.types)).forEach(function (type) {
+          var button = document.createElement("button"); button.type = "button"; button.dataset.type = type;
+          button.textContent = type === "all" ? "Все" : GameEvents.types[type].label;
+          button.addEventListener("click", function () { filter(type); }); nav.appendChild(button);
+        });
+        filter("all"); show(0);
+      }).catch(function () { document.getElementById("motion").textContent = "Не удалось загрузить события. Откройте страницу через локальный сервер."; });
+      document.querySelector(".replay").addEventListener("click", function () { if (content) show(selected); });
+    })();
+  </script>
+</body>
+</html>
