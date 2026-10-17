@@ -331,3 +331,58 @@ body {
 .flash .flash-ans { margin-top: 8px; padding: 6px 10px; border-radius: 10px; background: rgba(255,194,75,0.2); color: var(--gold); font-size: 14px; font-weight: 900; }
 .review-item .ri-tag { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 800; color: #1a1300; background: var(--gold); padding: 2px 8px; border-radius: 999px; }
 .review-item .ri-why { color: #f3dede; }
+
+/* ---------- Экраны: прокрутка без обрезки верха при переполнении ---------- */
+.screen { justify-content: flex-start; touch-action: pan-y; }
+.screen > :first-child { margin-top: auto; }
+.screen > :last-child { margin-bottom: auto; }
+input { -webkit-user-select: text; user-select: text; }
+
+/* ---------- Код забега ---------- */
+.code-box { display: flex; gap: 8px; align-items: center; margin-top: -8px; }
+.code-input {
+  width: 110px; padding: 11px 12px; border-radius: 14px; text-align: center;
+  font: 800 22px/1 ui-rounded, system-ui, sans-serif; letter-spacing: 4px;
+  color: #fff; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.35); outline: none;
+}
+.code-input:focus { border-color: var(--gold); }
+.code-input.err { border-color: var(--refuse); animation: codeShake 0.3s; }
+@keyframes codeShake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+#btn-code { margin-top: -6px; }
+
+.end-code { font-size: 15px; color: #e6efe9; max-width: 340px; }
+.end-code b { color: var(--gold); font-size: 22px; letter-spacing: 3px; margin-left: 4px; }
+.end-code .ec-sub { display: block; font-size: 12.5px; color: #c9d6cd; margin-top: 2px; }
+
+/* ---------- Злодеи-приёмы ---------- */
+.end-villains { width: 100%; max-width: 360px; }
+.villains-title { margin: 0 0 8px; font-size: 15px; font-weight: 900; color: #fff; }
+.villains-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.villain {
+  width: calc(25% - 5px); min-width: 72px; padding: 7px 2px 6px; border-radius: 12px;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+  animation: riseIn 0.35s ease-out both;
+}
+.villain .v-emoji { font-size: 24px; line-height: 1.1; }
+.villain .v-name { font-size: 11.5px; font-weight: 800; color: #fff; margin-top: 2px; }
+.villain .v-state { font-size: 10.5px; color: #c9d6cd; }
+.villain.caught { background: rgba(255,194,75,0.16); border-color: rgba(255,194,75,0.7); }
+.villain.caught .v-state { color: var(--gold); font-weight: 800; }
+.villain.escaped { background: rgba(229,72,77,0.12); border-color: rgba(229,72,77,0.5); }
+.villain.escaped .v-state { color: #ff9a9d; font-weight: 800; }
+.villain.unmet .v-emoji { filter: grayscale(1); opacity: 0.45; }
+.villain.unmet .v-name { color: #aab8ae; }
+
+/* ---------- Прогресс «начало → конец» ---------- */
+.progress {
+  width: 100%; max-width: 360px; padding: 10px 12px; border-radius: 16px;
+  background: rgba(0,193,160,0.10); border: 1px solid rgba(0,193,160,0.4);
+}
+.pg-row { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.pg-num { font-size: 26px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+.pg-num.up { color: var(--gold); }
+.pg-lbl { font-size: 12px; color: #c9d6cd; }
+.pg-arrow { font-size: 24px; color: var(--sber-teal); font-weight: 900; }
+.pg-note { font-size: 13.5px; font-weight: 800; color: #e6efe9; margin-top: 4px; }
+
+.flash .flash-villain { font-weight: 900; color: var(--gold); margin-bottom: 4px; }

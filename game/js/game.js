@@ -44,6 +44,16 @@
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
+  // Детерминированный ГСЧ: один и тот же код забега = одна и та же последовательность карточек
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      var t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function newRunCode() { return 1000 + ((Math.random() * 9000) | 0); }
   function easeOutBack(t) { var c = 1.9; t = t - 1; return 1 + (c + 1) * t * t * t + c * t * t; }
 
   // ---------- Состояние ----------
@@ -53,6 +63,10 @@
   var LANES = 3;
   var content = null, diff = null;
   var actionLaneById = {}, actionById = {};        // id действия -> индекс дорожки
+  var patternById = {};                            // id приёма -> злодей {name, emoji, tip}
+  var rng = Math.random, runCode = 0, friendRun = false;
+  var history = [];               // true/false по каждому решению — для «начало → конец»
+  var patStats = {};              // id приёма -> {ok, bad}
 
   var state = "loading";          // loading | start | run | end
   var player = { lane: 1, x: 0, targetX: 0, bob: 0 };
@@ -161,15 +175,19 @@
       .then(function (data) {
         content = data;
         diff = data.difficulty;
-        (data.actions || []).forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
+        applyContent(data);
         showScreen("start");
       })
       .catch(function () {
         // Фолбэк, если fetch недоступен (file://): минимальный контент
         content = FALLBACK; diff = FALLBACK.difficulty;
-        FALLBACK.actions.forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
+        applyContent(FALLBACK);
         showScreen("start");
       });
+  }
+  function applyContent(data) {
+    (data.actions || []).forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
+    (data.patterns || []).forEach(function (p) { patternById[p.id] = p; });
   }
 
   // ---------- Экраны ----------
@@ -184,7 +202,11 @@
   }
 
   // ---------- Старт забега ----------
-  function startRun() {
+  function startRun(code) {
+    friendRun = !!code;
+    runCode = code || newRunCode();
+    rng = mulberry32(runCode * 2654435761);
+    history = []; patStats = {};
     player.lane = 1; player.x = laneX(1); player.targetX = player.x; player.bob = 0;
     cards = []; speed = diff.startSpeed; elapsed = 0; spawnTimer = 0.9;
     meters = 0; coins = 0; combo = 0; bestCombo = 0; lives = diff.lives;
@@ -210,14 +232,16 @@
 
   // ---------- Спавн ситуаций ----------
   function spawnSituation() {
-    var s = pick(content.situations);
+    var list = content.situations;
+    var s = list[(rng() * list.length) | 0];
     var guard = 0;
-    while (s === lastSituation && guard++ < 5) s = pick(content.situations);
+    // не повторяем ту же карточку и тот же приём подряд (кроме «безопасных»)
+    while ((s === lastSituation || (lastSituation && s.pattern !== "safe" && s.pattern === lastSituation.pattern)) && guard++ < 8) s = list[(rng() * list.length) | 0];
     lastSituation = s;
     var lane = actionLaneById[s.answer];
     ctx.font = "700 15.5px " + FONT;
     cards.push({
-      icon: s.icon, text: s.text, why: s.why, answer: s.answer, lines: wrapLines(s.text, cardW() - 16),
+      icon: s.icon, text: s.text, why: s.why, answer: s.answer, pattern: s.pattern, lines: wrapLines(s.text, cardW() - 16),
       answerLane: lane, isTrap: s.answer !== "ok",
       x: laneX(1), y: -cardH(), resolved: false, result: null, flashT: 0, removeTimer: 0, age: 0
     });
@@ -364,6 +388,9 @@
     if (c.isTrap) trapsTotal++;
     var correct = player.lane === c.answerLane;
     c.result = correct ? "ok" : "bad";
+    history.push(correct);
+    if (c.pattern) { var ps = patStats[c.pattern] || (patStats[c.pattern] = { ok: 0, bad: 0 }); ps[correct ? "ok" : "bad"]++; }
+    var villain = patternById[c.pattern];
     c.flashT = 0.5;
     c.removeTimer = 0.5;
     var hy2 = playerY();
@@ -380,6 +407,7 @@
       addRing(player.x, hy2 + 30, 14, 90, LANE_RGB[c.answerLane], 0.5);
       laneFlash[c.answerLane] = 0.5;
       addFloat(player.x, hy2 - 62, pick(PRAISE[c.answer] || PRAISE.ok), "#ffffff", 22);
+      if (villain) addFloat(W / 2, H * 0.30, villain.emoji + " " + villain.name + " пойман!", "#ffc24b", 22);
       addFloat(player.x + 34, hy2 - 30, "+" + gain, "#ffc24b", 20);
       squashT = 0.16; hopT = 0.36;
       if (combo === 3 || (combo > 3 && combo % 4 === 0)) {
@@ -393,7 +421,7 @@
       var hadCombo = combo > 0;
       combo = 0; updateCombo(false);
       lives--; renderLives(lives);
-      misses.push({ icon: c.icon, text: c.text, why: c.why, isTrap: c.isTrap, answer: c.answer });
+      misses.push({ icon: c.icon, text: c.text, why: c.why, isTrap: c.isTrap, answer: c.answer, pattern: c.pattern });
       Bridge.vibrate(70); Sound.bad();
       shake(10); vignetteT = 0.5; squashT = 0.22; hurtT = 0.55;
       laneHint[c.answerLane] = 1.6;
@@ -416,7 +444,10 @@
   function showFlash(c) {
     var el = $("flash");
     var a = actionById[c.answer] || {};
-    el.innerHTML = '<span class="flash-icon">' + c.icon + "</span>" + escapeHtml(c.why) +
+    var v = patternById[c.pattern];
+    var who = v ? '<div class="flash-villain">' + v.emoji + " Это был " + escapeHtml(v.name) + "</div>"
+                : (!c.isTrap ? '<div class="flash-villain">Тут всё было честно</div>' : "");
+    el.innerHTML = '<span class="flash-icon">' + c.icon + "</span>" + who + escapeHtml(c.why) +
       '<div class="flash-ans">Верно: ' + (a.emoji || "") + " " + escapeHtml(a.label || "") + "</div>";
     el.classList.remove("hidden");
     el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";
@@ -461,8 +492,43 @@
       list.appendChild(d);
     });
 
-    Bridge.finish({ meters: Math.round(meters), coins: coins, trapsOK: trapsOK, trapsTotal: trapsTotal, bestCombo: bestCombo });
+    renderVillains();
+    renderProgress();
+    $("end-code").innerHTML = (friendRun ? "Забег друга, код " : "Код твоего забега: ") + "<b>" + runCode + "</b>" +
+      '<span class="ec-sub">' + (friendRun ? "Сравни результат с другом!" : "Поделись — друг пройдёт тот же забег") + "</span>";
+
+    Bridge.finish({ meters: Math.round(meters), coins: coins, trapsOK: trapsOK, trapsTotal: trapsTotal, bestCombo: bestCombo, runCode: runCode, villainsCaught: villainsCaught, villainsTotal: villainsTotal });
     Bridge.completed({ meters: Math.round(meters), trapsOK: trapsOK, trapsTotal: trapsTotal });
+  }
+
+  // Сетка «злодеев»: каждый приём мошенников — персонаж. Пойман = хотя бы раз верно распознан.
+  var villainsCaught = 0, villainsTotal = 0;
+  function renderVillains() {
+    var pats = content.patterns || [], h = "";
+    villainsCaught = 0; villainsTotal = pats.length;
+    pats.forEach(function (p) {
+      var st = patStats[p.id];
+      var cls = !st ? "unmet" : st.ok > 0 ? "caught" : "escaped";
+      if (cls === "caught") villainsCaught++;
+      h += '<div class="villain ' + cls + '"><div class="v-emoji">' + p.emoji + '</div><div class="v-name">' + escapeHtml(p.name) +
+        '</div><div class="v-state">' + (cls === "caught" ? "пойман" : cls === "escaped" ? "ускользнул" : "не встретился") + "</div></div>";
+    });
+    $("villains-grid").innerHTML = h;
+    $("villains-title").textContent = "Разоблачено жуликов: " + villainsCaught + " из " + villainsTotal;
+    $("end-villains").classList.toggle("hidden", !villainsTotal);
+  }
+
+  // «Доказательство обучения»: точность в первой и второй половине забега
+  function renderProgress() {
+    var el = $("end-progress"), n = history.length, half = Math.floor(n / 2);
+    if (n < 6) { el.classList.add("hidden"); return; }
+    function pct(a) { var k = 0; for (var i = 0; i < a.length; i++) if (a[i]) k++; return Math.round(100 * k / a.length); }
+    var a = pct(history.slice(0, half)), b = pct(history.slice(n - half));
+    var note = b > a ? "Ты учишься прямо в игре!" : b === a ? (b >= 80 ? "Стабильно и точно!" : "Ещё забег — и станет лучше!") : "К концу стало быстрее — попробуй ещё!";
+    el.innerHTML = '<div class="pg-row"><div class="pg-col"><div class="pg-num">' + a + '%</div><div class="pg-lbl">в начале</div></div>' +
+      '<div class="pg-arrow">→</div><div class="pg-col"><div class="pg-num' + (b > a ? " up" : "") + '">' + b + '%</div><div class="pg-lbl">в конце</div></div></div>' +
+      '<div class="pg-note">' + note + "</div>";
+    el.classList.remove("hidden");
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
@@ -926,8 +992,24 @@
   function setupUI() {
     $("btn-play").addEventListener("click", function () { Sound.ensure(); startRun(); });
     $("btn-again").addEventListener("click", function () { startRun(); });
+    $("btn-code").addEventListener("click", function () {
+      var box = $("code-box"); box.classList.toggle("hidden");
+      if (!box.classList.contains("hidden")) $("code-input").focus();
+    });
+    $("code-input").addEventListener("input", function () {
+      this.value = this.value.replace(/\D/g, "").slice(0, 4); this.classList.remove("err");
+    });
+    $("btn-code-go").addEventListener("click", function () {
+      var v = parseInt($("code-input").value, 10);
+      if (!(v >= 1000 && v <= 9999)) { $("code-input").classList.add("err"); return; }
+      $("code-input").blur(); Sound.ensure(); startRun(v);
+    });
     $("btn-share").addEventListener("click", function () {
-      Bridge.share({ text: "Я прошёл «Не попадись!»: " + Math.round(meters) + " м и распознал " + trapsOK + " ловушек!" });
+      Bridge.share({
+        text: "Я разоблачил " + villainsCaught + " из " + villainsTotal + " жуликов в «Не попадись!» 🛡️ " +
+          "Пройди мой забег — код " + runCode + ". Сможешь лучше?",
+        runCode: runCode
+      });
     });
     $("btn-close").addEventListener("click", function () { Bridge.close(); });
 
@@ -941,12 +1023,17 @@
   // ---------- Фолбэк-контент (если fetch не сработал) ----------
   var FALLBACK = {
     actions: [{ id: "refuse", lane: 0, emoji: "🛑", label: "Отказать" }, { id: "check", lane: 1, emoji: "🔎", label: "Проверить" }, { id: "ok", lane: 2, emoji: "✅", label: "Можно" }],
+    patterns: [
+      { id: "codethief", name: "Кодокрад", emoji: "🔑", answer: "refuse" },
+      { id: "prize", name: "Призовик", emoji: "🎁", answer: "refuse" },
+      { id: "linker", name: "Ссылочник", emoji: "🔗", answer: "check" }
+    ],
     difficulty: { startSpeed: 105, maxSpeed: 300, speedRampPerSec: 1.6, spawnGapStart: 2.4, spawnGapMin: 1.5, spawnGapRampPerSec: 0.008, lives: 3 },
     situations: [
-      { icon: "🔢", text: "Назови код из СМС", answer: "refuse", why: "Код из СМС — секрет, его нельзя говорить никому." },
-      { icon: "🎁", text: "Ты выиграл приз!", answer: "refuse", why: "Приз, который ты не выигрывал, — ловушка." },
-      { icon: "🔗", text: "Перейди: sber-priz.xyz", answer: "check", why: "Странная ссылка — лучше проверить." },
-      { icon: "🍽️", text: "Мама зовёт ужинать", answer: "ok", why: "Обычная просьба близкого — всё хорошо." }
+      { pattern: "codethief", icon: "💬", text: "Назови код из СМС", answer: "refuse", why: "Код из СМС — секрет, его нельзя говорить никому." },
+      { pattern: "prize", icon: "💬", text: "Ты выиграл телефон! Оплати доставку", answer: "refuse", why: "Приз, за который надо платить, — обман." },
+      { pattern: "linker", icon: "💬", text: "Перейди: sberr-priz.xyz", answer: "check", why: "Странная ссылка — лучше проверить." },
+      { pattern: "safe", icon: "💬", text: "Мама: «Иди ужинать!»", answer: "ok", why: "Обычная просьба мамы — всё хорошо." }
     ]
   };
 

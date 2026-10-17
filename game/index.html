@@ -46,17 +46,23 @@
           </svg>
         </div>
         <h1 class="game-title">Не попадись!</h1>
-        <p class="subtitle">Распознай ловушку на бегу</p>
+        <p class="subtitle">Разоблачи 7 жуликов на бегу</p>
       </div>
 
       <div class="howto">
         <p class="howto-title">Уводи героя на нужную дорожку:</p>
-        <div class="howto-row r0"><span class="he">🛑</span><b>Отказать</b> — код, пароль, «срочно переведи», приз</div>
-        <div class="howto-row r1"><span class="he">🔎</span><b>Проверить</b> — странная ссылка, «банк» в чате</div>
-        <div class="howto-row r2"><span class="he">✅</span><b>Можно</b> — мама, друг, уведомление в приложении</div>
+        <div class="howto-row r0"><span class="he">🛑</span><b>Отказать</b> — просят отдать код, деньги, карту, секрет или торопят</div>
+        <div class="howto-row r1"><span class="he">🔎</span><b>Проверить</b> — непонятно, кто пишет или куда ведёт ссылка</div>
+        <div class="howto-row r2"><span class="he">✅</span><b>Можно</b> — мама, друг, приложение банка</div>
       </div>
 
       <button class="btn-primary" id="btn-play">Играть</button>
+
+      <button class="btn-text" id="btn-code">Есть код забега от друга?</button>
+      <div class="code-box hidden" id="code-box">
+        <input id="code-input" class="code-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="1234" autocomplete="off" aria-label="Код забега" />
+        <button class="btn-secondary" id="btn-code-go">Пройти</button>
+      </div>
 
       <label class="sound-toggle">
         <input type="checkbox" id="sound-toggle" />
@@ -79,15 +85,24 @@
       <div class="decisions" id="end-decisions"></div>
       <div class="end-verdict" id="end-verdict"></div>
 
-      <div class="review" id="review">
-        <p class="review-title hidden" id="review-title">Разбор ошибок — нажми, чтобы понять:</p>
-        <div id="review-list"></div>
+      <div class="end-villains" id="end-villains">
+        <p class="villains-title" id="villains-title"></p>
+        <div class="villains-grid" id="villains-grid"></div>
       </div>
+
+      <div class="progress hidden" id="end-progress"></div>
+
+      <div class="end-code" id="end-code"></div>
 
       <div class="end-actions">
         <button class="btn-primary" id="btn-again">Ещё раз</button>
         <button class="btn-secondary" id="btn-share">Поделиться</button>
       </div>
+      <div class="review" id="review">
+        <p class="review-title hidden" id="review-title">Разбор ошибок — нажми, чтобы понять:</p>
+        <div id="review-list"></div>
+      </div>
+
       <button class="btn-text" id="btn-close">Выйти</button>
     </section>
 
