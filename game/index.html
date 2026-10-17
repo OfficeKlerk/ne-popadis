@@ -35,6 +35,9 @@
       <button class="legend-item lane-btn" data-lane="2" aria-label="Можно"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="lb-label">Можно</span></button>
     </div>
 
+    <!-- Подсказка обучения -->
+    <div id="tut" class="tut hidden"></div>
+
     <!-- Тост ачивки -->
     <div id="toast" class="toast hidden"></div>
 
@@ -44,41 +47,23 @@
     <!-- Стартовый экран -->
     <section id="screen-start" class="screen">
       <div class="brand">
-        <div class="logo-badge" id="logo-badge">
-          <svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
-            <path d="M32 6c9 5 17 6 22 6v18c0 14-9 24-22 28C19 54 10 44 10 30V12c5 0 13-1 22-6z" fill="#fff" fill-opacity=".95"/>
-            <path d="M32 11c7 4 13 5 17 5v14c0 11-7 19-17 23-10-4-17-12-17-23V16c4 0 10-1 17-5z" fill="#21a038"/>
-            <path d="M23 32l7 7 12-14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
         <h1 class="game-title">Не <span class="accent">попадись!</span></h1>
-        <p class="subtitle">Разоблачи 7 жуликов на бегу</p>
+        <p class="subtitle">Раскуси 7 жуликов на бегу</p>
       </div>
-
-      <div class="howto">
-        <p class="howto-title">Уводи героя на нужную дорожку:</p>
-        <div class="howto-row r0"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span><b>Отказать</b> — просят отдать код, деньги, карту, секрет или торопят</span></div>
-        <div class="howto-row r1"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15.2 15.2l4.8 4.8"/></svg></span><span><b>Проверить</b> — непонятно, кто пишет или куда ведёт ссылка</span></div>
-        <div class="howto-row r2"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Можно</b> — мама, друг, приложение банка</span></div>
-        <p class="howto-foot">🪙 Собирай монетки, обегай конусы. Раскусил жулика — ему <b>БДЫЩ!</b></p>
-      </div>
-
-      <button class="btn-primary" id="btn-play">Играть</button>
-
-
-      <label class="sound-toggle">
+      <div class="start-stage" aria-hidden="true"></div>
+      <div class="start-bottom">
+        <button class="btn-primary" id="btn-play">Играть</button>
+        <label class="sound-toggle">
         <input type="checkbox" id="sound-toggle" />
         <span class="pill" aria-hidden="true"></span>
         <span class="sound-lbl">Звук</span>
       </label>
-      <p class="hint">Жми кнопки внизу или свайпай влево/вправо</p>
+      </div>
     </section>
 
     <!-- Экран итога -->
     <section id="screen-end" class="screen hidden">
       <h2 class="end-title" id="end-title">Финиш!</h2>
-      <div class="stars" id="end-stars"></div>
-      <div class="end-verdict" id="end-verdict"></div>
 
       <div class="end-villains" id="end-villains">
         <p class="villains-title" id="villains-title"></p>
@@ -89,7 +74,6 @@
 
       <div class="end-actions">
         <button class="btn-primary" id="btn-again">Ещё раз</button>
-        <button class="btn-secondary" id="btn-share">Поделиться</button>
       </div>
 
       <div class="end-links">

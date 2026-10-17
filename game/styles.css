@@ -453,3 +453,34 @@ button { font-family: inherit; }
 .end-links .dot { color: var(--muted); font-weight: 900; }
 .end-links .btn-text { font-size: 13.5px; padding: 6px; }
 .more[open] { padding-top: 4px; }
+
+/* ---------- Старт: заголовок сверху, живая сцена в центре, «Играть» снизу ---------- */
+#screen-start {
+  justify-content: space-between;
+  background: linear-gradient(180deg, rgba(110,193,255,0.55) 0%, rgba(169,220,255,0.15) 34%, rgba(255,255,255,0) 55%, rgba(228,245,255,0.75) 100%);
+  padding-top: calc(env(safe-area-inset-top) + 48px);
+}
+#screen-start > :first-child, #screen-start > :last-child { margin: 0; }
+#screen-start .game-title { font-size: 50px; }
+.start-stage { flex: 1; }
+.start-bottom { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+#screen-start #btn-play { font-size: 22px; padding: 18px 64px; }
+
+/* ---------- Подсказка обучения над кнопками ---------- */
+.tut {
+  position: absolute; z-index: 6; bottom: calc(env(safe-area-inset-bottom) + 132px);
+  max-width: 250px; padding: 10px 14px; border-radius: 16px;
+  background: var(--ink); color: #fff; font-size: 14.5px; font-weight: 900; line-height: 1.25; text-align: center;
+  box-shadow: 0 8px 18px rgba(35,36,106,0.3);
+  animation: tutIn 0.3s cubic-bezier(.2,1.5,.4,1);
+}
+.tut::after { content: ""; position: absolute; bottom: -8px; width: 16px; height: 16px; background: var(--ink); transform: rotate(45deg); border-radius: 3px; }
+.tut.lane-0 { left: 12px; } .tut.lane-0::after { left: 34px; }
+.tut.lane-1 { left: 50%; transform: translateX(-50%); } .tut.lane-1::after { left: calc(50% - 8px); }
+.tut.lane-2 { right: 12px; } .tut.lane-2::after { right: 34px; }
+@keyframes tutIn { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
+.lane-btn.hint .lb-circle { animation: hintPulse 0.8s ease-in-out infinite; }
+@keyframes hintPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.16); box-shadow: 0 0 0 8px rgba(255,210,63,0.6); } }
+/* подсказка обучения — наверху, не перекрывает героя; нужная кнопка пульсирует */
+.tut { bottom: auto; top: calc(env(safe-area-inset-top) + 68px); left: 50% !important; right: auto !important; transform: translateX(-50%); max-width: 300px; font-size: 15.5px; }
+.tut::after { display: none; }

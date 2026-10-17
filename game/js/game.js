@@ -89,6 +89,8 @@
   var dramaT = 0;
   var cardsSpawned = 0, bossPhase = 0, bossIdx = 0, bossHits = 0, bossT = 0, bossHitT = 0, bossGone = false, finished = false;
   var BUB_H = 108, PH_H = 46;
+  // Обучение внутри игры: первые карточки ждут, пока ребёнок нажмёт верную кнопку
+  var tutIdx = 0, tutDone = false, tutShownKey = "";
   var trapsTotal = 0, trapsOK = 0, decisionsTotal = 0, decisionsOK = 0;
   var misses = [];                // {icon,text,why}
   var lastSituation = null;
@@ -284,6 +286,7 @@
     actors = []; pops = []; whineIdx = {}; achEarned = []; achQueue = []; toastT = 0; dodged = 0; dramaT = 0;
     cardsSpawned = 0; bossPhase = 0; bossIdx = 0; bossHits = 0; bossT = 0; bossHitT = 0; bossGone = false; finished = false;
     $("toast").classList.add("hidden");
+    tutIdx = tutDone || !content.tutorial ? 99 : 0; tutShownKey = ""; showTut(null);
     renderChase(false);
     updateCombo(false);
     syncLegend();
@@ -323,7 +326,7 @@
     var lane = actionLaneById[s.answer];
     ctx.font = "800 15.5px " + FONT;
     cards.push({
-      icon: s.icon, text: s.text, why: s.why, answer: s.answer, pattern: isBoss ? "boss" : s.pattern, lines: wrapLines(s.text, cardW() - 16),
+      icon: s.icon, text: s.text, why: s.why, hint: s.hint, answer: s.answer, pattern: isBoss ? "boss" : s.pattern, lines: wrapLines(s.text, cardW() - 16),
       answerLane: lane, isTrap: s.answer !== "ok", drama: !!s.drama, boss: isBoss, ph: Math.random() * 6,
       x: laneX(1), y: -cardH(), resolved: false, result: null, flashT: 0, removeTimer: 0, removeMax: 0.5, age: 0
     });
@@ -483,10 +486,18 @@
   }
   function resolveCard(c) {
     c.resolved = true;
-    decisionsTotal++;
-    if (c.isTrap) trapsTotal++;
     var correct = player.lane === c.answerLane;
     c.result = correct ? "ok" : "bad";
+    if (c.tut) {                               // обучающая карточка: только награда, без статистики
+      if (c.isTrap) { var tp = cardScreenPos(c); addActor("ko", c.pattern, tp.x, tp.y, 1); addPop("speech", tp.x, tp.y - 150, nextWhine(c.pattern), 1.6); }
+      else addFloat(W / 2, H * 0.36, "Верно!", "#ffffff", 24);
+      Sound.good(); spawnBurst(player.x, playerY(), LANE_COLORS[c.answerLane]); hopT = 0.36;
+      c.flashT = 0.5; c.removeTimer = c.removeMax = 0.6;
+      if (tutIdx >= content.tutorial.length) { tutDone = true; addFloat(W / 2, H * 0.24, "Теперь сам! 💪", "#ffd23f", 30); }
+      return;
+    }
+    decisionsTotal++;
+    if (c.isTrap) trapsTotal++;
     history.push(correct);
     if (c.pattern) { var ps = patStats[c.pattern] || (patStats[c.pattern] = { ok: 0, bad: 0 }); ps[correct ? "ok" : "bad"]++; }
     c.flashT = 0.5;
@@ -579,16 +590,7 @@
     countTo("end-coins", coins, "", 0.65);
     $("end-decisions").textContent = "Верных решений: " + decisionsOK + " из " + decisionsTotal;
 
-    var pct = trapsTotal ? trapsOK / trapsTotal : 1;
-    var verdict, stars3;
-    if (pct >= 0.9) { verdict = "🏆 Супер! Тебя почти не провести."; stars3 = 3; }
-    else if (pct >= 0.6) { verdict = "👍 Хорошо! Но пару ловушек ты пропустил."; stars3 = 2; }
-    else { verdict = "🧐 Давай ещё — мошенники хитрые, но ты научишься их ловить."; stars3 = 1; }
-    $("end-verdict").textContent = verdict;
-    var st = "";
-    for (var s = 0; s < 3; s++) st += '<span class="star' + (s < stars3 ? " on" : "") + '" style="animation-delay:' + (0.2 + s * 0.18) + 's">★</span>';
-    $("end-stars").innerHTML = st;
-    if (stars3 >= 2) spawnConfetti(0, -10, stars3 === 3 ? 60 : 30, false);
+    if (trapsOK >= 3) spawnConfetti(0, -10, 40, false);
 
     var list = $("review-list"); list.innerHTML = "";
     var uniq = {};
@@ -650,6 +652,15 @@
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
 
   // ---------- Монеты и препятствия ----------
+  function showTut(c) {
+    var key = c ? c.text + (player.lane === c.answerLane ? "1" : "0") : "";
+    if (key === tutShownKey) return; tutShownKey = key;
+    var el = $("tut"), btns = document.querySelectorAll("#lane-legend .lane-btn");
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("hint", !!c && i === c.answerLane && player.lane !== c.answerLane);
+    if (!c) { el.classList.add("hidden"); return; }
+    el.textContent = player.lane === c.answerLane ? "Да! 👍" : c.hint;
+    el.className = "tut lane-" + c.answerLane;
+  }
   function firstUnresolved() { for (var i = 0; i < cards.length; i++) if (!cards[i].resolved) return cards[i]; return null; }
   function updateItems(wdt, hasUnresolved) {
     itemTimer -= wdt;
@@ -659,7 +670,7 @@
         coinLine--; itemTimer = coinLine > 0 ? 0.16 : D("itemEvery", 0.7);
       } else {
         // препятствие — только в фазе бега и не прямо перед карточкой (иначе наказывали бы за верный ответ)
-        var allowObs = !hasUnresolved && spawnTimer > 1.4 && elapsed > 3 && bossPhase === 0;
+        var allowObs = !hasUnresolved && spawnTimer > 1.4 && elapsed > 3 && bossPhase === 0 && (!content.tutorial || tutIdx >= content.tutorial.length);
         if (allowObs && itemRng() < D("obstacleChance", 0.5)) {
           var ol = (itemRng() * 3) | 0;
           items.push({ kind: itemRng() < 0.5 ? "cone" : "barrier", lane: ol, p: 0 });
@@ -762,9 +773,12 @@
       var cp = (cur.y + cardH()) / pY;
       if (cp > 0.5) tsTarget = clamp((0.5 / D("decisionWindow", 3)) / (speed / pY), D("minTimeScale", 0.3), 1);
     }
+    var tutWait = cur && cur.tut && (cur.y + cardH()) / pY > 0.86 && player.lane !== cur.answerLane;
+    if (tutWait) tsTarget = 0;                 // обучение: мир ждёт верного нажатия, без штрафов
+    showTut(cur && cur.tut && (cur.y + cardH()) / pY > 0.7 ? cur : null);
     timeScale = lerp(timeScale, tsTarget, Math.min(1, dt * (tsTarget < timeScale ? 5 : 9)));
     slowVis = clamp((1 - timeScale) / 0.5, 0, 1);
-    if (slowVis > 0.6 && !slowHintShown && !(cur && cur.drama)) { slowHintShown = true; addFloat(W / 2, H * 0.17, "Не торопись — подумай", "#ffffff", 22); }
+    if (slowVis > 0.6 && !slowHintShown && !(cur && (cur.drama || cur.tut))) { slowHintShown = true; addFloat(W / 2, H * 0.17, "Не торопись — подумай", "#ffffff", 22); }
     if (cur && cur.drama && !cur.dramaShown && (cur.y + cardH()) / pY > 0.5) {
       cur.dramaShown = true; dramaT = 1.5; Sound.drama(); addFloat(W / 2, H * 0.17, "🤔 Хммм…", "#ffffff", 26);
     }
@@ -791,7 +805,10 @@
         // финальный босс: «звонок из банка» — 3 сообщения подряд, потом финиш
         bossPhase = 1; bossT = 0; dramaT = 1.8; spawnTimer = 2.4; Sound.drama();
         addPop("speech", W / 2, hy + 120, boss.intro || "📞 Входящий звонок…", 2.3);
-      } else if (spawnTimer <= 0 && !hasUnresolved && !ending) { spawnSituation(); spawnTimer = gap; }
+      } else if (spawnTimer <= 0 && !hasUnresolved && !ending) {
+        if (content.tutorial && tutIdx < content.tutorial.length) { spawnCard(content.tutorial[tutIdx], false); cards[cards.length - 1].tut = true; tutIdx++; spawnTimer = 1.4; }
+        else { spawnSituation(); spawnTimer = gap; }
+      }
     } else if (bossPhase <= 2 && !ending) {
       if (bossIdx < boss.messages.length) {
         if (spawnTimer <= 0 && !hasUnresolved) { spawnCard(boss.messages[bossIdx], true); bossIdx++; bossPhase = 2; spawnTimer = 1.1; }
@@ -1288,7 +1305,7 @@
   }
 
   function drawPlayer() {
-    if (state !== "run") return;
+    if (state !== "run" && state !== "start") return;
     var x = player.x + (hurtT > 0 ? Math.sin(hurtT * 70) * 6 * (hurtT / 0.55) : 0);
     var bounce = -Math.abs(Math.sin(player.bob)) * 3.5;
     var hop = hopT > 0 ? -Math.sin(Math.PI * (1 - hopT / 0.36)) * 20 : 0;
@@ -1413,13 +1430,6 @@
     $("btn-play").addEventListener("click", function () { Sound.ensure(); startRun(); });
     $("btn-again").addEventListener("click", function () { startRun(); });
     $("btn-more").addEventListener("click", function () { var m = $("more"); m.open = !m.open; if (m.open) m.scrollIntoView({ behavior: "smooth", block: "start" }); });
-    $("btn-share").addEventListener("click", function () {
-      Bridge.share({
-        text: "Я разоблачил " + villainsCaught + " из " + villainsTotal + " жуликов в «Не попадись!» 🛡️ " +
-          (achEarned.length ? "Ачивок: " + achEarned.length + ". " : "") + "А ты сможешь лучше?",
-        runCode: runCode
-      });
-    });
     $("btn-close").addEventListener("click", function () { Bridge.close(); });
 
     var tgl = $("sound-toggle");
