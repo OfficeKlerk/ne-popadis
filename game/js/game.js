@@ -73,6 +73,12 @@
   var cards = [];
   var speed = 0, elapsed = 0, spawnTimer = 0, roadScroll = 0;
   var meters = 0, coins = 0, combo = 0, bestCombo = 0, lives = 3;
+  // Раннер-слой: монеты и препятствия между решениями
+  var items = [], itemTimer = 0, coinLine = 0, coinLane = 1, itemRng = Math.random;
+  // Замедление на решении: мир идёт медленнее, пока ребёнок читает карточку
+  var timeScale = 1, slowVis = 0, slowHintShown = false;
+  // Погоня: 1 — жулик далеко, 0 — догнал
+  var chase = 1, chaseVis = 1, villainX = 0, villainKnock = 0, caught = false, lastChaseKey = -1;
   var trapsTotal = 0, trapsOK = 0, decisionsTotal = 0, decisionsOK = 0;
   var misses = [];                // {icon,text,why}
   var lastSituation = null;
@@ -226,6 +232,7 @@
         showScreen("start");
       });
   }
+  function D(key, def) { return diff && diff[key] != null ? diff[key] : def; }
   function applyContent(data) {
     (data.actions || []).forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
     (data.patterns || []).forEach(function (p) { patternById[p.id] = p; });
@@ -250,13 +257,16 @@
     history = []; patStats = {};
     player.lane = 1; player.x = laneX(1); player.targetX = player.x; player.bob = 0;
     cards = []; speed = diff.startSpeed; elapsed = 0; spawnTimer = 0.9;
-    meters = 0; coins = 0; combo = 0; bestCombo = 0; lives = diff.lives;
+    meters = 0; coins = 0; combo = 0; bestCombo = 0; lives = 0;
     trapsTotal = 0; trapsOK = 0; decisionsTotal = 0; decisionsOK = 0;
     misses = []; lastSituation = null; flashTimer = 0; ending = false; endTimer = 0;
     clearFx(); shakeT = 0; vignetteT = 0; squashT = 0; hopT = 0; hurtT = 0; feverGlow = 0;
     laneFlash[0] = laneFlash[1] = laneFlash[2] = 0; laneHint[0] = laneHint[1] = laneHint[2] = 0;
     lastDist = -1; lastCoins = -1;
-    renderLives(-1);
+    items = []; itemTimer = 1.2; coinLine = 0; itemRng = mulberry32(runCode * 7 + 13);
+    timeScale = 1; slowVis = 0; slowHintShown = false;
+    chase = 1; chaseVis = 1; villainX = laneX(1); villainKnock = 0; caught = false; lastChaseKey = -1;
+    renderChase(false);
     updateCombo(false);
     syncLegend();
     showScreen("run");
@@ -264,11 +274,20 @@
     Sound.swish();
   }
 
-  var livesEls = [];
-  function renderLives(lostIdx) {
-    var el = $("lives"), s = "";
-    for (var i = 0; i < diff.lives; i++) s += '<span class="life' + (i >= lives ? " lost" : "") + (i === lostIdx ? " pop" : "") + '">🛡️</span>';
-    el.innerHTML = s;
+  // Полоска погони в HUD: жулик едет по ней к герою
+  function renderChase(hit) {
+    var el = $("chase"); if (!el) return;
+    el.style.setProperty("--c", chaseVis.toFixed(3));
+    el.classList.toggle("danger", chase < 0.4);
+    if (hit) { el.classList.remove("hit"); void el.offsetWidth; el.classList.add("hit"); }
+  }
+  function chaseHit(amount) {
+    chase = Math.max(0, chase - amount);
+    renderChase(true);
+    if (chase <= 0.001 && !ending) {
+      caught = true; ending = true; endTimer = 2.0;
+      addFloat(W / 2, H * 0.36, "Жулик догнал!", "#ff7a92", 30);
+    }
   }
 
   // ---------- Спавн ситуаций ----------
@@ -466,11 +485,14 @@
         addRing(player.x, hy2 + 30, 20, 190, "255,194,75", 0.65);
         Sound.combo();
       }
+      var before = chase;
+      chase = Math.min(1, chase + D("chaseRecover", 0.12)); villainKnock = 0.6; renderChase(false);
+      if (before < 0.6) addFloat(W / 2, pY + 70, "Отбился!", "#ffd23f", 20);
       updateCombo(true);
     } else {
       var hadCombo = combo > 0;
       combo = 0; updateCombo(false);
-      lives--; renderLives(lives);
+      chaseHit(D("chaseWrong", 0.34));
       misses.push({ icon: c.icon, text: c.text, why: c.why, isTrap: c.isTrap, answer: c.answer, pattern: c.pattern });
       Bridge.vibrate(70); Sound.bad();
       shake(10); vignetteT = 0.5; squashT = 0.22; hurtT = 0.55;
@@ -478,7 +500,7 @@
       spawnBurst(player.x, hy2 - 30, "#ff5a5f"); spawnBurst(player.x, hy2, "#ff8a8e");
       addFloat(player.x, hy2 - 62, hadCombo ? "Серия прервана" : "Ой!", "#ff7a92", 22);
       showFlash(c);
-      if (lives <= 0) { ending = true; endTimer = 2.0; }
+
     }
   }
 
@@ -510,6 +532,7 @@
 
   function endRun() {
     showScreen("end");
+    $("end-title").textContent = caught ? "Жулик догнал!" : "Забег окончен!";
     cards = []; clearFx();
     counters = [];
     countTo("end-distance", Math.round(meters), "", 0.25);
@@ -583,6 +606,46 @@
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
 
+  // ---------- Монеты и препятствия ----------
+  function firstUnresolved() { for (var i = 0; i < cards.length; i++) if (!cards[i].resolved) return cards[i]; return null; }
+  function updateItems(wdt, hasUnresolved) {
+    itemTimer -= wdt;
+    if (itemTimer <= 0 && !ending) {
+      if (coinLine > 0) {
+        items.push({ kind: "coin", lane: coinLane, p: 0, ph: itemRng() * 6 });
+        coinLine--; itemTimer = coinLine > 0 ? 0.16 : D("itemEvery", 0.7);
+      } else {
+        // препятствие — только в фазе бега и не прямо перед карточкой (иначе наказывали бы за верный ответ)
+        var allowObs = !hasUnresolved && spawnTimer > 1.4 && elapsed > 3;
+        if (allowObs && itemRng() < D("obstacleChance", 0.5)) {
+          var ol = (itemRng() * 3) | 0;
+          items.push({ kind: itemRng() < 0.5 ? "cone" : "barrier", lane: ol, p: 0 });
+          itemTimer = D("itemEvery", 0.7);
+        } else {
+          coinLane = (itemRng() * 3) | 0; coinLine = 3 + ((itemRng() * 3) | 0); itemTimer = 0.01;
+        }
+      }
+    }
+    for (var i = items.length - 1; i >= 0; i--) {
+      var it = items[i];
+      it.p += speed * wdt / pY;
+      if (!it.done && it.p >= 0.97) {
+        it.done = true;
+        if (it.lane === player.lane) {
+          if (it.kind === "coin") {
+            coins++; it.got = true; Sound.coin();
+            if (!REDUCED) for (var k = 0; k < 4; k++) addParticle(player.x, pY - 10, (Math.random() - 0.5) * 120, -120 - Math.random() * 80, 0.45, 4, "#ffd23f", 300);
+          } else {
+            hurtT = 0.4; squashT = 0.2; shake(6); Sound.bad(); Bridge.vibrate(40);
+            addFloat(player.x, pY - 62, it.kind === "cone" ? "Бум!" : "Ай!", "#ff7a92", 22);
+            chaseHit(D("chaseObstacle", 0.12));
+          }
+        }
+      }
+      if (it.got || it.p > 1.3) items.splice(i, 1);
+    }
+  }
+
   // ---------- Обновление ----------
   var lastDist = -1, lastCoins = -1;
   function update(dt) {
@@ -618,25 +681,44 @@
       return;
     }
 
-    elapsed += dt;
-    speed = Math.min(diff.maxSpeed, diff.startSpeed + elapsed * diff.speedRampPerSec) * (0.68 + 0.32 * Math.min(1, elapsed / 20));
-    meters += speed * dt * 0.09;
-    roadScroll += speed * dt;
-    player.x = lerp(player.x, player.targetX, Math.min(1, dt * 14));
-    player.bob += dt * (11 + speed / 90);
+    // Замедление на решении: когда карточка во второй половине пути, мир замедляется так,
+    // чтобы на чтение и выбор оставалось ~decisionWindow секунд реального времени при любой скорости.
+    var cur = firstUnresolved(), tsTarget = 1;
+    if (cur) {
+      var cp = (cur.y + cardH()) / pY;
+      if (cp > 0.5) tsTarget = clamp((0.5 / D("decisionWindow", 3)) / (speed / pY), D("minTimeScale", 0.3), 1);
+    }
+    timeScale = lerp(timeScale, tsTarget, Math.min(1, dt * (tsTarget < timeScale ? 5 : 9)));
+    slowVis = clamp((1 - timeScale) / 0.5, 0, 1);
+    if (slowVis > 0.6 && !slowHintShown) { slowHintShown = true; addFloat(W / 2, H * 0.17, "Не торопись — подумай", "#ffffff", 22); }
+    var wdt = dt * timeScale;      // «мировое» время
 
-    // одно решение за раз: новая карточка — только когда нет нерешённых
-    var hasUnresolved = false;
-    for (var k2 = 0; k2 < cards.length; k2++) { if (!cards[k2].resolved) { hasUnresolved = true; break; } }
-    spawnTimer -= dt;
-    var gap = Math.max(diff.spawnGapMin, diff.spawnGapStart - elapsed * diff.spawnGapRampPerSec) * (elapsed < 20 ? 1.3 : 1);
+    elapsed += wdt;
+    speed = Math.min(diff.maxSpeed, diff.startSpeed + elapsed * diff.speedRampPerSec) * (0.75 + 0.25 * Math.min(1, elapsed / 15));
+    meters += speed * wdt * 0.09;
+    roadScroll += speed * wdt;
+    player.x = lerp(player.x, player.targetX, Math.min(1, dt * 14));   // герой реагирует в реальном времени
+    player.bob += wdt * (11 + speed / 90);
+
+    // одно решение за раз; между решениями — фаза бега (монеты и препятствия)
+    var hasUnresolved = !!cur;
+    if (!hasUnresolved) spawnTimer -= wdt;
+    var gap = Math.max(D("runGapMin", 2.2), D("runGapStart", 3.4) - elapsed * 0.01);
     if (spawnTimer <= 0 && !hasUnresolved && !ending) { spawnSituation(); spawnTimer = gap; }
+    updateItems(wdt, hasUnresolved);
+
+    // погоня: плавное движение жулика
+    chaseVis = lerp(chaseVis, chase, Math.min(1, dt * 4));
+    villainX = lerp(villainX, player.x, Math.min(1, dt * 3));
+    if (villainKnock > 0) villainKnock -= dt;
+    var ck = Math.round(chaseVis * 200);
+    if (ck !== lastChaseKey) { lastChaseKey = ck; renderChase(false); }
 
     // движение карточек
     var pYY = playerY();
     for (var j = cards.length - 1; j >= 0; j--) {
       var c = cards[j];
-      c.y += speed * dt; c.age += dt;
+      c.y += speed * wdt; c.age += dt;
       if (!c.resolved) {
         // карточка «едет» за героем на выбранную дорожку — связь выбора и действия
         c.x = lerp(c.x, laneX(player.lane), Math.min(1, dt * 10));
@@ -672,12 +754,106 @@
       var m = shakeMag * (shakeT / 0.3);
       ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
     }
+    if (slowVis > 0.01 && !REDUCED) {          // лёгкий «наезд камеры» в момент решения
+      var z = 1 + 0.035 * slowVis;
+      ctx.translate(W / 2, pY); ctx.scale(z, z); ctx.translate(-W / 2, -pY);
+    }
     drawRoad();
-    for (var i = 0; i < cards.length; i++) drawCard(cards[i]);
+    var cur = firstUnresolved(), cardP = cur ? (cur.y + cardH()) / pY : 9, i;
+    for (i = 0; i < items.length; i++) if (items[i].p < cardP) drawItem(items[i]);
+    for (i = 0; i < cards.length; i++) drawCard(cards[i]);
+    for (i = 0; i < items.length; i++) if (items[i].p >= cardP) drawItem(items[i]);
+    drawVillain();      // позади героя, чтобы герой всегда был виден
     drawPlayer();
     drawFx();
     ctx.restore();
     drawVignette();
+    drawSlowFx();
+  }
+
+  // Рамка «фокуса» во время замедления
+  function drawSlowFx() {
+    if (slowVis <= 0.02 || state !== "run") return;
+    var g = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.28, W / 2, H * 0.55, H * 0.75);
+    g.addColorStop(0, "rgba(115,80,255,0)");
+    g.addColorStop(1, "rgba(115,80,255," + (0.22 * slowVis) + ")");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawItem(it) {
+    var p = Math.min(it.p, 1.3), r = rOf(p), y = yOf(r), x = sxAt(laneX(it.lane), r);
+    if (y > H + 60) return;
+    ctx.save(); ctx.translate(x, y);
+    // тень
+    ctx.fillStyle = "rgba(35,36,106,0.16)";
+    ctx.beginPath(); ctx.ellipse(0, 0, (it.kind === "barrier" ? 34 : 15) * r, 5 * r, 0, 0, 6.2832); ctx.fill();
+    if (it.kind === "coin") {
+      var R = 15 * r, spin = Math.max(0.18, Math.abs(Math.cos(tAnim * 4 + it.ph)));
+      ctx.translate(0, -R - 10 * r + Math.sin(tAnim * 5 + it.ph) * 3 * r);
+      ctx.scale(spin, 1);
+      ctx.fillStyle = "#d99a00"; ctx.beginPath(); ctx.arc(0, 2.5 * r, R, 0, 6.2832); ctx.fill();
+      var cg = ctx.createRadialGradient(-R * 0.35, -R * 0.4, 1, 0, 0, R);
+      cg.addColorStop(0, "#fff3b0"); cg.addColorStop(0.5, "#ffd23f"); cg.addColorStop(1, "#f5b800");
+      ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.2832); ctx.fill();
+      ctx.strokeStyle = "rgba(217,154,0,0.8)"; ctx.lineWidth = 2 * r; ctx.beginPath(); ctx.arc(0, 0, R * 0.62, 0, 6.2832); ctx.stroke();
+    } else if (it.kind === "cone") {
+      var h = 46 * r, b = 17 * r;
+      ctx.fillStyle = "#e05a1a"; ctx.fillRect(-b * 1.25, -5 * r, b * 2.5, 6 * r);
+      ctx.fillStyle = "#ff8a3d";
+      ctx.beginPath(); ctx.moveTo(-b, -4 * r); ctx.lineTo(-3 * r, -h); ctx.lineTo(3 * r, -h); ctx.lineTo(b, -4 * r); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath(); ctx.moveTo(-b * 0.72, -h * 0.32); ctx.lineTo(-b * 0.5, -h * 0.55); ctx.lineTo(b * 0.5, -h * 0.55); ctx.lineTo(b * 0.72, -h * 0.32); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.2 * r; ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(-b, -4 * r); ctx.lineTo(-3 * r, -h); ctx.lineTo(3 * r, -h); ctx.lineTo(b, -4 * r); ctx.closePath(); ctx.stroke();
+    } else {
+      var bw = 34 * r, bh = 34 * r;
+      ctx.fillStyle = "#8c90bd"; ctx.fillRect(-bw + 2 * r, -bh, 5 * r, bh); ctx.fillRect(bw - 7 * r, -bh, 5 * r, bh);
+      ctx.save(); roundRect(-bw, -bh - 4 * r, bw * 2, 15 * r, 5 * r); ctx.clip();
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(-bw, -bh - 4 * r, bw * 2, 15 * r);
+      ctx.fillStyle = "#ff4d6d";
+      for (var sx2 = -bw - 10 * r; sx2 < bw; sx2 += 16 * r) { ctx.beginPath(); ctx.moveTo(sx2, -bh + 11 * r); ctx.lineTo(sx2 + 8 * r, -bh + 11 * r); ctx.lineTo(sx2 + 16 * r, -bh - 4 * r); ctx.lineTo(sx2 + 8 * r, -bh - 4 * r); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+      ctx.strokeStyle = INK; ctx.lineWidth = 2.2 * r; roundRect(-bw, -bh - 4 * r, bw * 2, 15 * r, 5 * r); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Жулик сзади героя: чем ближе погоня, тем выше он выглядывает из-за нижней панели
+  function drawVillain() {
+    if (state !== "run") return;
+    var knock = villainKnock > 0 ? Math.sin(Math.PI * (1 - villainKnock / 0.6)) * 40 : 0;
+    var vy = pY + 74 + chaseVis * 120 + knock, vx = villainX;
+    if (vy - 100 > H) return;
+    var bob = Math.abs(Math.sin(player.bob * 1.1)) * 4, s = 1.25;
+    ctx.save(); ctx.translate(vx, vy - bob); ctx.scale(s, s);
+    // ноги
+    var sw = Math.sin(player.bob * 1.1);
+    ctx.strokeStyle = INK; ctx.lineWidth = 6; ctx.lineCap = "round";
+    ctx.beginPath(); ctx.moveTo(-9, -6); ctx.lineTo(-9, 4 + sw * 4); ctx.moveTo(9, -6); ctx.lineTo(9, 4 - sw * 4); ctx.stroke();
+    // тело-балахон
+    ctx.fillStyle = "#4a2bd0"; ctx.strokeStyle = INK; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(-26, -4); ctx.quadraticCurveTo(-30, -52, 0, -64); ctx.quadraticCurveTo(30, -52, 26, -4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    // лицо
+    ctx.fillStyle = "#ffd9b8"; ctx.beginPath(); ctx.ellipse(0, -38, 16, 14, 0, 0, 6.2832); ctx.fill();
+    // маска
+    ctx.fillStyle = "#14143a"; roundRect(-18, -46, 36, 11, 5); ctx.fill();
+    var look = clamp((player.x - vx) / 60, -1, 1) * 2;
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(-7, -40.5, 3.6, 0, 6.2832); ctx.arc(7, -40.5, 3.6, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = INK; ctx.beginPath(); ctx.arc(-7 + look, -41.5, 1.8, 0, 6.2832); ctx.arc(7 + look, -41.5, 1.8, 0, 6.2832); ctx.fill();
+    // ухмылка
+    ctx.strokeStyle = INK; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.arc(2, -32, 6, 0.15 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+    // руки тянутся к герою, когда близко
+    var reach = clamp(1 - chaseVis / 0.5, 0, 1) * 10;
+    ctx.fillStyle = "#ffd9b8"; ctx.strokeStyle = INK; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(-28, -26 - reach, 5.5, 0, 6.2832); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(28, -26 - reach, 5.5, 0, 6.2832); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    if (chaseVis < 0.4 && !ending) {
+      var a = 0.6 + 0.4 * Math.sin(tAnim * 10);
+      ctx.globalAlpha = a; ctx.font = "900 26px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.strokeText("!", vx + 40, vy - 86 * s); ctx.fillStyle = "#ff4d6d"; ctx.fillText("!", vx + 40, vy - 86 * s);
+      ctx.globalAlpha = 1;
+    }
   }
 
   function drawVignette() {
@@ -857,7 +1033,7 @@
     var p = clamp((c.y + h) / pY, 0, 1.38);
     var r = rOf(p), sy = yOf(r), sx = sxAt(c.x, r);
     var rn = clamp((r - RT) / (1 - RT), 0, 1.4);
-    var s = 0.8 + 0.2 * rn;                       // читаемость: карточка не уменьшается сильно
+    var s = (0.8 + 0.2 * rn) * (c.resolved ? 1 : 1 + 0.08 * slowVis);   // читаемость; в замедлении — чуть крупнее
     var alpha = clamp(c.age / 0.18, 0, 1), pop = 1;
     if (c.age < 0.28) pop = 0.55 + 0.45 * easeOutBack(c.age / 0.28);
     var lift = 0;
@@ -1094,7 +1270,7 @@
       { id: "prize", name: "Призовик", emoji: "🎁", answer: "refuse" },
       { id: "linker", name: "Ссылочник", emoji: "🔗", answer: "check" }
     ],
-    difficulty: { startSpeed: 105, maxSpeed: 300, speedRampPerSec: 1.6, spawnGapStart: 2.4, spawnGapMin: 1.5, spawnGapRampPerSec: 0.008, lives: 3 },
+    difficulty: { startSpeed: 140, maxSpeed: 330, speedRampPerSec: 1.6 },
     situations: [
       { pattern: "codethief", icon: "💬", text: "Назови код из СМС", answer: "refuse", why: "Код из СМС — секрет, его нельзя говорить никому." },
       { pattern: "prize", icon: "💬", text: "Ты выиграл телефон! Оплати доставку", answer: "refuse", why: "Приз, за который надо платить, — обман." },

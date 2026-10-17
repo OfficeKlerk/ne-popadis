@@ -20,7 +20,10 @@
       </div>
       <div class="hud-right">
         <div class="hud-chip combo hidden" id="combo">x2</div>
-        <div class="lives" id="lives"></div>
+        <div class="chase" id="chase" aria-label="Погоня">
+          <span class="chase-track"><span class="chase-v"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#4a2bd0"/><ellipse cx="12" cy="13.5" rx="7" ry="6" fill="#ffd9b8"/><rect x="4.5" y="9" width="15" height="4.6" rx="2.3" fill="#14143a"/><circle cx="9" cy="11.3" r="1.4" fill="#fff"/><circle cx="15" cy="11.3" r="1.4" fill="#fff"/></svg></span></span>
+          <span class="chase-h">🛡️</span>
+        </div>
         <button class="icon-btn" id="sound-run" aria-label="Звук">🔈</button>
       </div>
     </div>
@@ -54,6 +57,7 @@
         <div class="howto-row r0"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span><b>Отказать</b> — просят отдать код, деньги, карту, секрет или торопят</span></div>
         <div class="howto-row r1"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15.2 15.2l4.8 4.8"/></svg></span><span><b>Проверить</b> — непонятно, кто пишет или куда ведёт ссылка</span></div>
         <div class="howto-row r2"><span class="he"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Можно</b> — мама, друг, приложение банка</span></div>
+        <p class="howto-foot">🪙 Собирай монетки, обегай конусы — и не дай жулику догнать!</p>
       </div>
 
       <button class="btn-primary" id="btn-play">Играть</button>
@@ -74,7 +78,7 @@
 
     <!-- Экран итога -->
     <section id="screen-end" class="screen hidden">
-      <h2 class="end-title">Забег окончен!</h2>
+      <h2 class="end-title" id="end-title">Забег окончен!</h2>
       <div class="stars" id="end-stars"></div>
       <div class="end-stats">
         <div class="stat"><div class="stat-num" id="end-distance">0</div><div class="stat-lbl">метров</div></div>

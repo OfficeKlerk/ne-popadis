@@ -391,3 +391,15 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Погоня (вместо щитов) ---------- */
+.chase { display: flex; align-items: center; gap: 6px; padding: 6px 10px; background: var(--tile); border-radius: 14px; box-shadow: var(--card-sh); --c: 1; }
+.chase-track { position: relative; width: 92px; height: 12px; border-radius: 999px; background: linear-gradient(90deg, #ffe3ea, #dcf8ea); box-shadow: inset 0 2px 3px rgba(35,36,106,0.12); }
+.chase-v { position: absolute; top: 50%; left: calc((1 - var(--c)) * 70px); width: 24px; height: 24px; transform: translateY(-50%); filter: drop-shadow(0 2px 0 rgba(35,36,106,0.25)); }
+.chase-v svg { width: 100%; height: 100%; display: block; }
+.chase-h { font-size: 19px; line-height: 1; }
+.chase.danger { animation: dangerPulse 0.8s ease-in-out infinite; }
+.chase.danger .chase-track { background: linear-gradient(90deg, #ff9db0, #ffe3ea); }
+.chase.hit { animation: chipPop 0.35s ease-out; }
+@keyframes dangerPulse { 0%,100% { box-shadow: var(--card-sh); } 50% { box-shadow: 0 4px 0 rgba(212,42,76,0.4), 0 0 0 4px rgba(255,77,109,0.35); } }
+.howto-foot { margin: 10px 2px 0; padding-top: 9px; border-top: 2px dashed #e2e8f6; font-size: 13px; font-weight: 800; color: var(--ink); }
