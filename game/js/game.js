@@ -556,6 +556,10 @@
       laneFlash[c.answerLane] = 0.5;
       addFloat(player.x, hy2 - 62, pick(PRAISE[c.answer] || PRAISE.ok), "#ffffff", 22);
       addFloat(player.x + 34, hy2 - 30, "+" + gain, "#ffc24b", 20);
+      // Явный тост исхода + celebration на каждый верный ответ (виральность)
+      addFloat(W / 2, H * 0.30, "Верно!", "#1e9e5a", 34);
+      spawnConfetti(player.x, hy2 - 10, 14, true);
+      addRing(player.x, hy2 + 30, 16, 120, LANE_RGB[c.answerLane], 0.55);
       squashT = 0.16; hopT = 0.36;
       if (combo === 3 || (combo > 3 && combo % 4 === 0)) {
         spawnConfetti(player.x, hy2 - 10, 26, true);
@@ -574,6 +578,8 @@
       laneHint[c.answerLane] = 1.6;
       spawnBurst(player.x, hy2 - 30, "#ff5a5f"); spawnBurst(player.x, hy2, "#ff8a8e");
       addFloat(player.x, hy2 - 62, hadCombo ? "Серия прервана" : "Ой!", "#ff8a8e", 22);
+      // Явный тост исхода: честно отличаем ловушку от «зря отказался от безопасного»
+      addFloat(W / 2, H * 0.30, c.isTrap ? "Ой, ловушка!" : "Это было безопасно", "#ff4d6d", 30);
       showFlash(c);
       eventView.hide();
       if (lives <= 0) { ending = true; endTimer = Math.max(2, flashTimer); syncPhaseUI(); }

@@ -12,7 +12,7 @@
 .ev-timing { padding:7px 9px 0; display:flex; gap:8px; align-items:center; }
 .ev-timing>div { height:3px; flex:1; overflow:hidden; border-radius:3px; background:#8affd326; }
 .ev-timing span { display:block; height:100%; background:#77e3bb; transform-origin:left; }
-.ev-timing small { font-size:10px; color:#c1d6d7; text-shadow:0 1px 3px #001b22; }
+.ev-timing small { font-size:13.5px; font-weight:800; color:#c1d6d7; text-shadow:0 1px 3px #001b22; }
 .ev-result { position:absolute; inset:0; border-radius:inherit; background:#103d35ed; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800; font-size:15px; color:#b2f6cd; }
 .ev-result[hidden] { display:none; }
 .ev-miss .ev-result { background:#3a3020ed; color:#ffe0a0; }
