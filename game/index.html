@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <link rel="icon" href="data:," />
+  <title>Не попадись!</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Игровое поле -->
+    <canvas id="game"></canvas>
+
+    <!-- HUD во время забега -->
+    <div id="hud" class="hud hidden">
+      <div class="hud-left">
+        <div class="hud-chip" id="distance">0 м</div>
+        <div class="hud-chip coins" id="coins"><span class="coin-dot"></span><span id="coins-n">0</span></div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-chip combo hidden" id="combo">x2</div>
+        <div class="lives" id="lives"></div>
+        <button class="icon-btn" id="sound-run" aria-label="Звук">🔈</button>
+      </div>
+    </div>
+
+    <!-- Подсказка действий (нижние дорожки) -->
+    <div id="lane-legend" class="lane-legend hidden">
+      <div class="legend-item" data-lane="0"><span class="legend-emoji">🛑</span><span>Отказать</span></div>
+      <div class="legend-item" data-lane="1"><span class="legend-emoji">🔎</span><span>Проверить</span></div>
+      <div class="legend-item" data-lane="2"><span class="legend-emoji">✅</span><span>Можно</span></div>
+    </div>
+
+    <!-- Всплывающее «почему» при ошибке -->
+    <div id="flash" class="flash hidden"></div>
+
+    <!-- Стартовый экран -->
+    <section id="screen-start" class="screen">
+      <div class="brand">
+        <div class="logo-badge" id="logo-badge">
+          <svg viewBox="0 0 64 64" width="56" height="56" aria-hidden="true">
+            <path d="M32 6c9 5 17 6 22 6v18c0 14-9 24-22 28C19 54 10 44 10 30V12c5 0 13-1 22-6z" fill="#fff" fill-opacity=".95"/>
+            <path d="M32 11c7 4 13 5 17 5v14c0 11-7 19-17 23-10-4-17-12-17-23V16c4 0 10-1 17-5z" fill="#21a038"/>
+            <path d="M23 32l7 7 12-14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 class="game-title">Не попадись!</h1>
+        <p class="subtitle">Распознай ловушку на бегу</p>
+      </div>
+
+      <div class="howto">
+        <p class="howto-title">Уводи героя на нужную дорожку:</p>
+        <div class="howto-row r0"><span class="he">🛑</span><b>Отказать</b> — код, пароль, «срочно переведи», приз</div>
+        <div class="howto-row r1"><span class="he">🔎</span><b>Проверить</b> — странная ссылка, «банк» в чате</div>
+        <div class="howto-row r2"><span class="he">✅</span><b>Можно</b> — мама, друг, уведомление в приложении</div>
+      </div>
+
+      <button class="btn-primary" id="btn-play">Играть</button>
+
+      <label class="sound-toggle">
+        <input type="checkbox" id="sound-toggle" />
+        <span class="pill" aria-hidden="true"></span>
+        <span class="sound-lbl">Звук</span>
+      </label>
+      <p class="hint">Свайп влево/вправо или нажми на сторону экрана</p>
+    </section>
+
+    <!-- Экран итога -->
+    <section id="screen-end" class="screen hidden">
+      <h2 class="end-title">Забег окончен!</h2>
+      <div class="stars" id="end-stars"></div>
+      <div class="end-stats">
+        <div class="stat"><div class="stat-num" id="end-distance">0</div><div class="stat-lbl">метров</div></div>
+        <div class="stat"><div class="stat-num" id="end-recognized">0/0</div><div class="stat-lbl">ловушек распознано</div></div>
+        <div class="stat"><div class="stat-num" id="end-coins">0</div><div class="stat-lbl">монет</div></div>
+      </div>
+
+      <div class="decisions" id="end-decisions"></div>
+      <div class="end-verdict" id="end-verdict"></div>
+
+      <div class="review" id="review">
+        <p class="review-title hidden" id="review-title">Разбор ошибок — нажми, чтобы понять:</p>
+        <div id="review-list"></div>
+      </div>
+
+      <div class="end-actions">
+        <button class="btn-primary" id="btn-again">Ещё раз</button>
+        <button class="btn-secondary" id="btn-share">Поделиться</button>
+      </div>
+      <button class="btn-text" id="btn-close">Выйти</button>
+    </section>
+
+    <!-- Загрузка -->
+    <section id="screen-loading" class="screen">
+      <div class="loader"></div>
+      <p>Загрузка…</p>
+    </section>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
