@@ -170,7 +170,8 @@
 
   // ---------- Загрузка контента ----------
   function loadContent() {
-    fetch("content.json", { cache: "no-store" })
+    var req = location.protocol === "file:" ? Promise.reject(new Error("file://")) : fetch("content.json", { cache: "no-store" });
+    req
       .then(function (r) { return r.json(); })
       .then(function (data) {
         content = data;
@@ -179,9 +180,10 @@
         showScreen("start");
       })
       .catch(function () {
-        // Фолбэк, если fetch недоступен (file://): минимальный контент
-        content = FALLBACK; diff = FALLBACK.difficulty;
-        applyContent(FALLBACK);
+        // fetch недоступен (file://) — берём полную копию из content.js, в крайнем случае минимальный FALLBACK
+        var data = window.GAME_CONTENT && window.GAME_CONTENT.situations ? window.GAME_CONTENT : FALLBACK;
+        content = data; diff = data.difficulty;
+        applyContent(data);
         showScreen("start");
       });
   }
