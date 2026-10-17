@@ -606,8 +606,6 @@
 
     renderVillains();
     renderProgress();
-    $("end-code").innerHTML = (friendRun ? "Забег друга, код " : "Код твоего забега: ") + "<b>" + runCode + "</b>" +
-      '<span class="ec-sub">' + (friendRun ? "Сравни результат с другом!" : "Поделись — друг пройдёт тот же забег") + "</span>";
 
     Bridge.finish({ meters: Math.round(meters), coins: coins, trapsOK: trapsOK, trapsTotal: trapsTotal, bestCombo: bestCombo, runCode: runCode, villainsCaught: villainsCaught, villainsTotal: villainsTotal });
     Bridge.completed({ meters: Math.round(meters), trapsOK: trapsOK, trapsTotal: trapsTotal });
@@ -1414,23 +1412,11 @@
   function setupUI() {
     $("btn-play").addEventListener("click", function () { Sound.ensure(); startRun(); });
     $("btn-again").addEventListener("click", function () { startRun(); });
-    $("btn-code").addEventListener("click", function () {
-      var box = $("code-box"); box.classList.toggle("hidden");
-      if (!box.classList.contains("hidden")) $("code-input").focus();
-    });
-    $("code-input").addEventListener("input", function () {
-      this.value = this.value.replace(/\D/g, "").slice(0, 4); this.classList.remove("err");
-    });
-    $("btn-code-go").addEventListener("click", function () {
-      var v = parseInt($("code-input").value, 10);
-      if (!(v >= 1000 && v <= 9999)) { $("code-input").classList.add("err"); return; }
-      $("code-input").blur(); Sound.ensure(); startRun(v);
-    });
+    $("btn-more").addEventListener("click", function () { var m = $("more"); m.open = !m.open; if (m.open) m.scrollIntoView({ behavior: "smooth", block: "start" }); });
     $("btn-share").addEventListener("click", function () {
       Bridge.share({
         text: "Я разоблачил " + villainsCaught + " из " + villainsTotal + " жуликов в «Не попадись!» 🛡️ " +
-          (achEarned.length ? "Ачивок: " + achEarned.length + ". " : "") +
-          "Пройди мой забег — код " + runCode + ". Сможешь лучше?",
+          (achEarned.length ? "Ачивок: " + achEarned.length + ". " : "") + "А ты сможешь лучше?",
         runCode: runCode
       });
     });

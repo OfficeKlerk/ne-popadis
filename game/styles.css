@@ -437,4 +437,19 @@ button { font-family: inherit; }
 .end-title { font-size: 34px; }
 #distance { display: none; }
 .hud-chip { white-space: nowrap; }
-.villain .v-name { font-size: 10.5px; overflow-wrap: anywhere; }
+.villain .v-name { font-size: 10.5px; overflow-wrap: normal; -webkit-hyphens: auto; hyphens: auto; }
+
+/* ---------- Финиш: компактно, один акцент — коллекция жуликов ---------- */
+#screen-end { gap: 12px; }
+#screen-end .end-title { font-size: 36px; }
+#screen-end .stars { font-size: 40px; height: 44px; margin-top: -4px; }
+#screen-end .end-verdict { font-size: 15px; font-weight: 800; color: var(--ink-2); max-width: 320px; }
+#screen-end .end-villains { padding: 12px 10px 14px; }
+#screen-end .villains-title { font-size: 16px; }
+#screen-end .end-ach { gap: 5px; }
+#screen-end .ach-chip { font-size: 12px; padding: 5px 9px; }
+#screen-end .end-actions { margin-top: 4px; }
+.end-links { display: flex; align-items: center; gap: 4px; }
+.end-links .dot { color: var(--muted); font-weight: 900; }
+.end-links .btn-text { font-size: 13.5px; padding: 6px; }
+.more[open] { padding-top: 4px; }
