@@ -83,7 +83,7 @@
       if (wallet.pending) return;
       resetAnimation();
       $("reward-overlay").classList.add('hidden');
-      $("screen-end").inert = false;
+      window.GamePlatform.block($("screen-end"), false);
       if (returnTo) {
         var target = returnTo === 'pet' ? $("run-pets").querySelector('button') : $("chest-list").querySelector('[data-buy="' + returnTo + '"]');
         if (!target || target.disabled) target = $("btn-again");
@@ -92,7 +92,7 @@
     }
     function showOverlay() {
       $("reward-overlay").classList.remove('hidden');
-      $("screen-end").inert = true;
+      window.GamePlatform.block($("screen-end"), true);
       $("reward-dialog").focus();
     }
     $("chest-list").addEventListener('click', function (event) {

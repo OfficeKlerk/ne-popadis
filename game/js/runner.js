@@ -7,8 +7,14 @@
     random = random || Math.random;
     var course = { obstacles: [], coins: [], time: 0, duration: 10, round: 0, ready: false, jumpTime: -1, jumpHeight: 0, invulnerable: 0, rowsSpawned: 0, objectsSpawned: 0 };
     var nextSpawn = 0, count = 0, travel = 1, gap = 1, rowCount = 5, lastSafeLane = 1, serial = 0;
-    function coin(lane, p, height, barrierId) {
-      course.coins.push({ id: serial++, type: "coin", lane: lane, p: p, height: height || 30, airborne: !!height, barrierId: barrierId, travel: travel, collected: false });
+    function coin(lane, p, height, barrierId, value) {
+      var item = { id: serial++, type: "coin", lane: lane, p: p, height: height || 30, airborne: !!height, barrierId: barrierId, value: value || 1, travel: travel, collected: false };
+      course.coins.push(item);
+      return item;
+    }
+    function jumpBonus(lane, barrierId) {
+      // Одна монета X5 на вершине прыжка, в той же плоскости, что и барьер.
+      coin(lane, 0, 34 + JUMP_HEIGHT, barrierId, 5);
     }
     course.begin = function (round, seconds, speedMultiplier) {
       course.obstacles.length = 0; course.coins.length = 0;
@@ -17,7 +23,7 @@
       course.rowsSpawned = 0; course.objectsSpawned = 0;
       // Та же базовая скорость сближения, ускоренная вместе с дорогой в 1,5 раза.
       travel = Math.max(2.8, 3.5 - round * 0.07) / (speedMultiplier || 1.5);
-      rowCount = round === 0 ? 5 : 7;
+      rowCount = round === 0 ? 5 : round < 3 ? 7 : 8;
       nextSpawn = 0.55; count = 0; lastSafeLane = 1; serial = 0;
       gap = (course.duration - 0.45 - travel * EXIT - nextSpawn) / (rowCount - 1);
       // Первые монеты видны сразу; до первого препятствия остаётся время для манёвра.
@@ -35,27 +41,27 @@
       var safe = routes[Math.floor(random() * routes.length)];
       var blocked = [0, 1, 2].filter(function (lane) { return lane !== safe; });
       var lane = course.round === 0 && count === 0 ? 1 : blocked[Math.floor(random() * blocked.length)];
-      var type = count % 2 === 0 ? "barrier" : "crate";
-      var row = { id: count, hit: false, jumped: false, safeLane: safe };
-      course.obstacles.push({ lane: lane, type: type, row: row, p: 0, checked: false, hit: false, jumped: false, travel: travel });
-      course.objectsSpawned++;
-      // Три парных ряда из семи: 10 объектов вместо прежних 3–6, без перекрытия всех дорожек.
-      if (course.round >= 3 && count % 2 === 1) {
-        var second = blocked[0] === lane ? blocked[1] : blocked[0];
-        course.obstacles.push({ lane: second, type: type === "barrier" ? "crate" : "barrier", row: row, p: 0, checked: false, hit: false, jumped: false, travel: travel, noReward: true });
+      // Плотность выше примерно в 1,5 раза: 11 / 17 / 20 объектов за отрезок.
+      // Между обязательными прыжками всегда есть обычный ряд для приземления.
+      var requiresJump = course.round === 0 ? count === 2 : course.round < 3 ? count >= 2 && count % 2 === 0 : count % 2 === 1;
+      var type = requiresJump || count % 2 === 0 ? "barrier" : "crate";
+      var row = { id: count, hit: false, jumped: false, safeLane: safe, requiresJump: requiresJump };
+      function obstacle(at, kind, secondary) {
+        course.obstacles.push({ lane: at, type: kind, row: row, p: 0, checked: false, hit: false, jumped: false, travel: travel, noReward: !!secondary });
         course.objectsSpawned++;
       }
-      for (var c = 0; c < 4; c++) coin(safe, 0.25 - c * 0.1);
-      // Иногда над низким барьером есть бонусная дуга. Её высота совпадает с
-      // траекторией прыжка: три монеты на взлёте, в верхней точке и на спуске.
-      // Свободная дорожка с обычными монетами по-прежнему доступна.
-      if (type === "barrier" && (Math.floor(count / 2) + course.round) % 2 === 0) {
-        for (var a = 0; a < 3; a++) {
-          var offset = (1 - a) * .09;
-          var jumpProgress = (JUMP_TIME / 2 - offset * travel) / JUMP_TIME;
-          coin(lane, offset, 34 + 4 * JUMP_HEIGHT * jumpProgress * (1 - jumpProgress), count);
-        }
+      if (requiresJump) lane = safe;
+      obstacle(lane, type, false);
+      if (requiresJump) {
+        obstacle(blocked[0], "crate", true);
+        obstacle(blocked[1], "crate", true);
+      } else {
+        var second = blocked[0] === lane ? blocked[1] : blocked[0];
+        obstacle(second, type === "barrier" ? "crate" : "barrier", true);
       }
+      if (!requiresJump) for (var c = 0; c < 4; c++) coin(safe, 0.25 - c * 0.1).rowId = count;
+      // Поздние участки оставляют промежуточные ряды без бонусного прыжка.
+      if (requiresJump || (course.round < 3 && type === "barrier" && (Math.floor(count / 2) + course.round) % 2 === 0)) jumpBonus(lane, count);
       lastSafeLane = safe; count++; course.rowsSpawned = count; nextSpawn += gap;
     }
     course.update = function (dt, playerLane, playerRadius) {

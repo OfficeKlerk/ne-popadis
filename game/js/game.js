@@ -6,9 +6,8 @@
   var Bridge = {
     completedSent: false,
     send: function (type, payload) {
-      var msg = { type: type, payload: payload || {} };
-      try { window.parent && window.parent.postMessage(msg, "*"); } catch (e) {}
-      try { if (window.parent !== window) window.postMessage(msg, "*"); } catch (e) {}
+      var msg = { type: type, params: payload || {} };
+      try { window.postMessage(msg, "*"); } catch (e) {}
     },
     vibrate: function (ms) { this.send("VIBRATION_EVENT", { duration: ms || 30 }); },
     finish: function (data) { this.send("FINISH_EVENT", data); },
@@ -56,15 +55,18 @@
   var actionLaneById = {}, actionById = {};        // id действия -> индекс дорожки
 
   var state = "loading";          // loading | start | run | end
-  var paused = false;
+  var paused = false, tutorialOpen = false;
   var player = { lane: 1, x: 0, targetX: 0, bob: 0 };
   var cards = [];
+  var RUN_SECONDS = 4 * 60;
+  var runTime = 0; // Активное реальное время, независимо от шага физики.
   var speed = 0, elapsed = 0, roadScroll = 0;
   var course = window.RunnerCourse.create();
   var phase = "road", round = 0, obstaclesCleared = 0, obstacleHits = 0;
   var cityCheer = 0, roadCoins = 0, roadObjects = [];
   var meters = 0, coins = 0, combo = 0, bestCombo = 0, lives = 3;
   var trapsTotal = 0, trapsOK = 0, decisionsTotal = 0, decisionsOK = 0;
+  var misses = [];                // ошибочные решения для разбора на финише
   var lastSituation = null;
   var flashTimer = 0;
   var ending = false, endTimer = 0;
@@ -84,7 +86,7 @@
   var laneHint = [0, 0, 0];       // подсказка «верная дорожка» после ошибки
   var LANE_COLORS = ["#ff4d6d", "#7350ff", "#22c37a"]; // отказать / проверить / можно
   var LANE_RGB = ["255,77,109", "115,80,255", "34,195,122"];
-  var EVENT_SYMBOLS = { call: "📞", chat: "💬", account: "🔐", card: "💳", gift: "🎁", transfer: "↔", browser: "✉", notification: "🔔", coin: "🪙" };
+  var EVENT_SYMBOLS = { call: "📞", chat: "💬", account: "🔐", card: "💳", gift: "🎁", transfer: "↔", browser: "✉", notification: "🔔", coin: "🪙", purchase: "🏷️" };
   var FONT = "-apple-system, system-ui, 'Segoe UI', Roboto, sans-serif";
 
   // ---------- Геометрия псевдо-перспективы ----------
@@ -113,7 +115,8 @@
   }
 
   function makeTown(w, h, seed, blur, scale) {
-    var c = document.createElement("canvas"); c.width = Math.round(w * DPR); c.height = Math.round(h * DPR);
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w * DPR)); c.height = Math.max(1, Math.round(h * DPR));
     var g = c.getContext("2d"); g.scale(DPR, DPR);
     var s = seed;
     function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
@@ -169,6 +172,10 @@
   function resize() {
     var app = $("app");
     W = app.clientWidth; H = app.clientHeight;
+    // Фолбэк: в скрытой вкладке / 0-размерном контейнере не даём нулевые размеры,
+    // иначе offscreen-canvas получается 0×0 и drawImage падает (краш инициализации).
+    if (W < 50) W = window.innerWidth || 360;
+    if (H < 50) H = window.innerHeight || 640;
     cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
     cv.style.width = W + "px"; cv.style.height = H + "px";
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -203,20 +210,16 @@
 
   // ---------- Загрузка контента ----------
   function loadContent() {
-    fetch("content.json", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        content = data;
-        diff = data.difficulty;
-        (data.actions || []).forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
-        showScreen("start");
-      })
-      .catch(function () {
-        // Фолбэк, если fetch недоступен (file://): минимальный контент
-        content = FALLBACK; diff = FALLBACK.difficulty;
-        FALLBACK.actions.forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
-        showScreen("start");
-      });
+    // Full catalog is a local script: file://, localhost and WebView use the same data.
+    content = window.GAME_CONTENT;
+    if (!content || !content.difficulty || !content.actions || !content.situations || !content.situations.length) {
+      $("screen-loading").innerHTML = '<p>Не удалось открыть игру. Распакуй всю папку game или открой play.html.</p>';
+      return false;
+    }
+    diff = content.difficulty;
+    content.actions.forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
+    showScreen("start");
+    return true;
   }
 
   // ---------- Экраны ----------
@@ -231,12 +234,30 @@
     if (s !== "run") { $("flash").classList.add("hidden"); }
   }
 
+  function setTutorial(open) {
+    tutorialOpen = open;
+    $("tutorial-overlay").classList.toggle("hidden", !open);
+    window.GamePlatform.block($("screen-start"), open);
+    window.GamePlatform.block(cv, open);
+    if (open) $("btn-tutorial-start").focus();
+  }
+  function openTutorial() {
+    if (state !== "start" || tutorialOpen) return;
+    setTutorial(true);
+  }
+  function finishTutorial() {
+    if (!tutorialOpen) return;
+    if (Sound.on) Sound.ensure();
+    startRun(); cv.focus();
+  }
+
   function setPaused(value, restoreFocus) {
     if (value && state !== "run") return;
     paused = !!value;
+    last = 0; // Не включать время паузы в следующий кадр таймера.
     $("pause-overlay").classList.toggle("hidden", !paused);
     $("app").classList.toggle("is-paused", paused);
-    ["hud", "event-stage", "lane-legend"].forEach(function (id) { $(id).inert = paused; });
+    ["hud", "event-stage", "lane-legend"].forEach(function (id) { window.GamePlatform.block($(id), paused); });
     if (Sound.ctx) {
       var pending = paused ? Sound.ctx.suspend() : Sound.ctx.resume();
       if (pending && pending.catch) pending.catch(function () {});
@@ -252,14 +273,17 @@
 
   // ---------- Старт забега ----------
   function startRun() {
+    setTutorial(false);
     setPaused(false); rewardShop.reset(); counters = [];
     eventView.hide();
     player.lane = 1; player.x = laneX(1); player.targetX = player.x; player.bob = 0;
-    cards = []; speed = diff.startSpeed; elapsed = 0;
+    cards = []; speed = diff.startSpeed; elapsed = 0; runTime = 0;
+    $("run-complete").classList.add("hidden");
     phase = "road"; round = 0; obstaclesCleared = 0; obstacleHits = 0; roadCoins = 0; cityCheer = 0; roadScroll = 0;
     course.begin(round, diff.runSeconds || 10, diff.runSpeedMultiplier || 1.5);
     meters = 0; coins = 0; combo = 0; bestCombo = 0; lives = diff.lives;
     trapsTotal = 0; trapsOK = 0; decisionsTotal = 0; decisionsOK = 0;
+    misses = [];
     lastSituation = null; flashTimer = 0; ending = false; endTimer = 0;
     clearFx(); shakeT = 0; vignetteT = 0; squashT = 0; hopT = 0; hurtT = 0; feverGlow = 0;
     laneFlash[0] = laneFlash[1] = laneFlash[2] = 0; laneHint[0] = laneHint[1] = laneHint[2] = 0;
@@ -290,25 +314,25 @@
   }
 
   // ---------- Спавн ситуаций ----------
-  function decisionSeconds(distance) {
-    // Плавное ускорение: 7 секунд в начале, минус 0,5 с за каждые 200 м, минимум 2 с.
-    var initial = Math.max(2, diff.eventReadSeconds || 7);
-    return Math.max(2, initial - Math.max(0, distance) / (diff.eventRampMeters || 400));
+  function decisionSeconds() {
+    // Шесть секунд чтения и выбора при любой дистанции и скорости бега.
+    return 6;
   }
   function spawnSituation() {
+    // Последнее сообщение тоже получает полные шесть секунд до финиша.
+    if (RUN_SECONDS - runTime < decisionSeconds() + .1) return;
     // Монетка из прежнего каталога теперь собирается на дороге и не требует решения.
     var situations = content.situations.filter(function (s) { return s.delivery !== "pickup"; });
-    if (!situations.length) situations = FALLBACK.situations;
     var s = pick(situations);
     var guard = 0;
     while (s === lastSituation && guard++ < 5) s = pick(situations);
     lastSituation = s;
     var lane = actionLaneById[s.answer];
-    var duration = decisionSeconds(meters);
+    var duration = decisionSeconds();
     cards.push({
       icon: s.icon, text: s.text, why: s.why, answer: s.answer, visual: s.visual,
       answerLane: lane, isTrap: s.answer !== "ok",
-      x: laneX(player.lane), y: -cardH(), resolved: false, result: null, flashT: 0, removeTimer: 0, age: 0, duration: duration
+      x: laneX(player.lane), y: -cardH(), resolved: false, result: null, flashT: 0, removeTimer: 0, age: 0, duration: duration, presented: false
     });
     phase = "decision"; syncPhaseUI();
     eventView.show(s); eventView.update(0, duration);
@@ -343,6 +367,10 @@
   }
   function setupInput() {
     document.addEventListener("keydown", function (e) {
+      if (tutorialOpen) {
+        if (e.key === "Escape" && !e.repeat) { e.preventDefault(); finishTutorial(); }
+        return;
+      }
       if (state !== "run") return;
       var key = e.key.toLowerCase();
       if (key === "escape" || key === "p" || key === "з") { e.preventDefault(); if (!e.repeat) setPaused(!paused, true); return; }
@@ -360,7 +388,7 @@
     cv.addEventListener("pointerdown", function (e) {
       if (pointer !== null || !e.isPrimary || e.button !== 0) return;
       sx = e.clientX; sy = e.clientY; pointer = e.pointerId;
-      cv.setPointerCapture(e.pointerId);
+      try { if (cv.setPointerCapture) cv.setPointerCapture(e.pointerId); } catch (ignored) {}
     });
     cv.addEventListener("pointerup", function (e) {
       if (pointer !== e.pointerId) return;
@@ -382,7 +410,7 @@
   for (i0 = 0; i0 < PMAX; i0++) particles.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 3, color: "#fff", grav: 0, shape: 0, rot: 0, vr: 0 });
   for (i0 = 0; i0 < 6; i0++) rings.push({ x: 0, y: 0, life: 0, max: 1, r0: 10, r1: 60, color: "255,255,255" });
   for (i0 = 0; i0 < 6; i0++) floats.push({ x: 0, y: 0, life: 0, max: 1, text: "", color: "#fff", size: 20, vy: -50 });
-  for (i0 = 0; i0 < 12; i0++) coinFlights.push({ life: 0, max: .68, x: 0, y: 0, cx: 0, cy: 0, tx: 0, ty: 0, scale: 1 });
+  for (i0 = 0; i0 < 12; i0++) coinFlights.push({ life: 0, max: .68, x: 0, y: 0, cx: 0, cy: 0, tx: 0, ty: 0, scale: 1, value: 1 });
   var pCursor = 0, rCursor = 0, fCursor = 0;
 
   function clearFx() {
@@ -399,7 +427,8 @@
   }
   function collectCoin(c) {
     if (REDUCED) return;
-    var r = rOf(c.p), x = sxAt(laneX(c.lane), r), y = yOf(r) + (36 - c.height) * r;
+    var pos = coinPosition(c), r = pos.scale, x = pos.x, y = pos.y;
+    if (c.value === 5) addFloat(x, y - 28, "+5", "#945916", 24);
     addRing(x, y, 8, 34, "255,205,63", .28);
     for (var n = 0; n < 5; n++) {
       var a = n * Math.PI * 2 / 5;
@@ -409,7 +438,7 @@
       var f = coinFlights[i]; if (f.life > 0) continue;
       // DOM geometry is read once at pickup, never during a frame's rendering.
       var target = $("coin-target").getBoundingClientRect(), field = cv.getBoundingClientRect();
-      f.x = x; f.y = y; f.scale = r;
+      f.x = x; f.y = y; f.scale = r; f.value = c.value || 1;
       f.tx = (target.left + target.width / 2 - field.left) * W / field.width;
       f.ty = (target.top + target.height / 2 - field.top) * H / field.height;
       f.cx = clamp(x + (x < W / 2 ? 55 : -55), 24, W - 24); f.cy = y - 135;
@@ -428,7 +457,7 @@
       ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
       ctx.globalAlpha = .45; ctx.drawImage(glowGold, -31, -31, 62, 62); ctx.globalAlpha = 1;
       ctx.rotate(Math.sin(age * Math.PI) * .3);
-      drawCoinFace(.85 + .15 * Math.cos(age * 10));
+      drawCoinFace(.85 + .15 * Math.cos(age * 10), f.value);
       ctx.restore();
     }
   }
@@ -549,6 +578,10 @@
       laneFlash[c.answerLane] = 0.5;
       addFloat(player.x, hy2 - 62, pick(PRAISE[c.answer] || PRAISE.ok), "#ffffff", 22);
       addFloat(player.x + 34, hy2 - 30, "+" + gain, "#ffc24b", 20);
+      // Явный тост исхода + celebration на каждый верный ответ (виральность)
+      addFloat(W / 2, H * 0.30, "Верно!", "#1e9e5a", 34);
+      spawnConfetti(player.x, hy2 - 10, 14, true);
+      addRing(player.x, hy2 + 30, 16, 120, LANE_RGB[c.answerLane], 0.55);
       squashT = 0.16; hopT = 0.36;
       if (combo === 3 || (combo > 3 && combo % 4 === 0)) {
         spawnConfetti(player.x, hy2 - 10, 26, true);
@@ -559,6 +592,7 @@
       updateCombo(true);
     } else {
       var hadCombo = combo > 0;
+      misses.push({ icon: c.icon, text: c.text, why: c.why, answer: c.answer, isTrap: c.isTrap });
       combo = 0; updateCombo(false);
       lives--; renderLives(lives);
       Bridge.vibrate(70); Sound.bad();
@@ -566,6 +600,8 @@
       laneHint[c.answerLane] = 1.6;
       spawnBurst(player.x, hy2 - 30, "#ff5a5f"); spawnBurst(player.x, hy2, "#ff8a8e");
       addFloat(player.x, hy2 - 62, hadCombo ? "Серия прервана" : "Ой!", "#ff8a8e", 22);
+      // Явный тост исхода: честно отличаем ловушку от «зря отказался от безопасного»
+      addFloat(W / 2, H * 0.30, c.isTrap ? "Ой, ловушка!" : "Это было безопасно", "#ff4d6d", 30);
       showFlash(c);
       eventView.hide();
       if (lives <= 0) { ending = true; endTimer = Math.max(2, flashTimer); syncPhaseUI(); }
@@ -583,7 +619,8 @@
         if (e.jumped) addRing(player.x, playerY() + 34, 12, 55, "255,194,75", .4);
       }
       if (e.type === "coin" && !ending) {
-        coins++; roadCoins++; cityCheer = 1.5; Sound.coin();
+        var value = e.coin.value || 1;
+        coins += value; roadCoins += value; cityCheer = 1.5; Sound.coin();
         collectCoin(e.coin);
       }
       if (e.type === "hit" && !ending) {
@@ -624,32 +661,66 @@
   var counters = [];
   function countTo(id, to, suffix, delay) { counters.push({ el: $(id), to: to, t: -delay, suf: suffix || "" }); $(id).textContent = "0" + (suffix || ""); }
 
-  function endRun() {
+  function endRun(completed) {
     if (state !== "run") return;
+    var success = completed === true && lives > 0 && runTime + 1e-9 >= RUN_SECONDS;
+    $("run-complete").classList.toggle("hidden", !success);
+    $("end-title").classList.toggle("hidden", success);
+    $("screen-end").setAttribute("aria-labelledby", success ? "complete-title" : "end-title");
     setPaused(false);
     showScreen("end");
+    $("screen-end").scrollTop = 0;
     cards = []; course.obstacles.length = 0; course.coins.length = 0; course.jumpHeight = 0; clearFx();
     counters = [];
     countTo("end-distance", Math.round(meters), "", 0.1);
     countTo("end-coins", coins, "", 0.2);
-    countTo("end-recognized", trapsOK, "", 0.3);
+    $("end-recognized").textContent = trapsOK + "/" + trapsTotal;
     var pct = decisionsTotal ? decisionsOK / decisionsTotal : 0;
     var verdict = !decisionsTotal ? "Каждый забег — новая попытка. У тебя получится!" :
       pct >= .9 ? "Отличная внимательность! Продолжай в том же духе." :
       pct >= .6 ? "Хороший забег! Продолжай замечать ловушки." :
       "С каждым забегом ты внимательнее. Попробуй ещё!";
     $("end-verdict").textContent = verdict;
+    renderReview();
     rewardShop.start(coins);
 
-    Bridge.finish({ meters: Math.round(meters), coins: coins, trapsOK: trapsOK, trapsTotal: trapsTotal, bestCombo: bestCombo });
-    Bridge.completed({ meters: Math.round(meters), trapsOK: trapsOK, trapsTotal: trapsTotal });
+    Bridge.finish({ meters: Math.round(meters), coins: coins, trapsOK: trapsOK, trapsTotal: trapsTotal, bestCombo: bestCombo, seconds: runTime, result: success ? "completed" : lives <= 0 ? "lost" : "stopped" });
+    if (success) Bridge.completed({ meters: Math.round(meters), trapsOK: trapsOK, trapsTotal: trapsTotal, seconds: runTime });
   }
 
   function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
 
+  // ---------- Разбор ошибок на финише («почему») ----------
+  function renderReview() {
+    var el = $("end-review");
+    if (!el) return;
+    var seen = {}, uniq = [];
+    for (var i = 0; i < misses.length; i++) { var m = misses[i]; if (seen[m.text]) continue; seen[m.text] = 1; uniq.push(m); }
+    if (!uniq.length) {
+      // Хвалим за «без ошибок» только если ребёнок реально встречал ловушки
+      el.innerHTML = decisionsTotal > 0
+        ? '<p class="review-allgood">🎉 Ни одной ошибки — ты раскусил все ловушки!</p>'
+        : '<p class="review-neutral">Ловушки ждут впереди — беги дальше и проверяй сообщения!</p>';
+      return;
+    }
+    var html = '<p class="review-title">Разбор — нажми, чтобы понять:</p>';
+    for (var r = 0; r < Math.min(5, uniq.length); r++) {
+      var u = uniq[r], act = actionById[u.answer] || {};
+      var tag = u.isTrap ? '' : '<span class="review-safe">это было безопасно</span>';
+      html += '<button class="review-item" type="button">' +
+        '<span class="ri-top">' + u.icon + ' <span class="ri-text">' + escapeHtml(u.text) + '</span>' + tag + '</span>' +
+        '<span class="ri-why">' + escapeHtml(u.why) +
+        ' <b>Верно: ' + (act.emoji || '') + ' ' + escapeHtml(act.label || '') + '</b></span>' +
+        '</button>';
+    }
+    el.innerHTML = html;
+    var items = el.querySelectorAll('.review-item');
+    for (var k = 0; k < items.length; k++) items[k].addEventListener('click', function () { this.classList.toggle('open'); });
+  }
+
   // ---------- Обновление ----------
   var lastDist = -1, lastCoins = -1;
-  function update(dt) {
+  function update(dt, decisionDt) {
     if (paused) return;
     rewardShop.update(dt);
     tAnim += dt;
@@ -690,6 +761,21 @@
       return;
     }
 
+    var remaining = RUN_SECONDS - runTime;
+    runTime = Math.min(RUN_SECONDS, runTime + Math.max(0, decisionDt === undefined ? dt : decisionDt));
+    if (runTime + 1e-9 >= RUN_SECONDS) {
+      runTime = RUN_SECONDS;
+      // Даже при задержке последнего кадра засчитать уже завершившееся окно ответа.
+      for (var finalCard = 0; finalCard < cards.length; finalCard++) {
+        var pendingCard = cards[finalCard];
+        if (!pendingCard.resolved && pendingCard.presented && pendingCard.age + remaining + 1e-9 >= pendingCard.duration) {
+          pendingCard.age = pendingCard.duration;
+          resolveCard(pendingCard);
+        }
+      }
+      endRun(!ending && lives > 0);
+      return;
+    }
     elapsed += dt;
     speed = Math.min(diff.maxSpeed, diff.startSpeed + elapsed * diff.speedRampPerSec) * (0.68 + 0.32 * Math.min(1, elapsed / 20)) * (diff.runSpeedMultiplier || 1.5);
     meters += speed * dt * 0.09;
@@ -706,13 +792,15 @@
     var pYY = playerY();
     for (var j = cards.length - 1; j >= 0; j--) {
       var c = cards[j];
-      c.age += dt;
+      // Новый текст сначала рисуется целиком; прошедшее до появления время не списываем.
+      if (c.presented) c.age = Math.min(c.duration, c.age + (decisionDt === undefined ? dt : decisionDt));
+      else c.presented = true;
       if (!c.resolved) {
         c.y = lerp(-cardH(), pYY - cardH(), clamp(c.age / c.duration, 0, 1));
         eventView.update(c.age / c.duration, c.duration - c.age);
         // карточка «едет» за героем на выбранную дорожку — связь выбора и действия
         c.x = lerp(c.x, laneX(player.lane), Math.min(1, dt * 10));
-        if (c.age >= c.duration) resolveCard(c);
+        if (c.age + 1e-9 >= c.duration) resolveCard(c);
       } else {
         c.removeTimer -= dt;
       }
@@ -882,23 +970,6 @@
     }
     ctx.fill();
 
-    // стрелки-шевроны в цвет дорожек (бегут к герою, ярче в нижней трети)
-    N = 5; ph = (u * N + 0.5) % 1;
-    ctx.lineJoin = "round"; ctx.lineCap = "round";
-    for (j = 0; j < LANES; j++) {
-      ctx.strokeStyle = "rgba(" + (phase === "road" ? "115,80,255,0.17" : LANE_RGB[j] + ",0.5") + ")";
-      ctx.beginPath();
-      var cxb = laneX(j);
-      for (i = 0; i <= N + 1; i++) {
-        var pc = (i - 1 + ph) / N; if (pc < 0.05) continue; if (pc > 1.22) break;
-        var rc = rOf(pc), yc = yOf(rc), sz = 15 * rc, cx2 = sxAt(cxb, rc);
-        if (yc > H - 4) break;
-        ctx.moveTo(cx2 - sz, yc + sz * 0.5); ctx.lineTo(cx2, yc - sz * 0.5); ctx.lineTo(cx2 + sz, yc + sz * 0.5);
-      }
-      ctx.lineWidth = 3.5;
-      ctx.stroke();
-    }
-
     // линия решения — «сканер» на уровне героя
     ctx.fillStyle = "rgba(255,255,255," + (0.07 + 0.05 * Math.sin(tAnim * 5)) + ")";
     if (phase !== "road") ctx.fillRect(roadLeft, pY + 31, roadWidth, 3);
@@ -934,24 +1005,34 @@
       if (o.type === "coin") drawCoin(o); else drawObstacle(o);
     }
   }
-  function drawCoin(c) {
-    var r = rOf(c.p), x = sxAt(laneX(c.lane), r), ground = yOf(r) + 36 * r;
-    if (ground - c.height * r > H + 60) return;
-    ctx.save(); ctx.translate(x, ground); ctx.scale(r,r);
-    ctx.fillStyle="rgba(0,10,18,.3)";ctx.beginPath();ctx.ellipse(0,2,15,4,0,0,Math.PI*2);ctx.fill();
-    ctx.translate(0,-c.height);
-    ctx.globalAlpha=.35;ctx.drawImage(glowGold,-29,-29,58,58);ctx.globalAlpha=1;
-    var turn = REDUCED ? .95 : .72 + .28 * Math.sin(tAnim * 3 + c.id * .4);
-    drawCoinFace(turn); ctx.restore();
+  function coinPosition(c) {
+    var r = rOf(c.p), x = sxAt(laneX(c.lane), r);
+    return { x: x, y: yOf(r) + (36 - c.height) * r, ground: yOf(r) + 36 * r, scale: r * (c.value === 5 ? 1.75 : 1.2) };
   }
-  function drawCoinFace(turn) {
+  function drawCoin(c) {
+    var pos = coinPosition(c);
+    if (pos.y > H + 60) return;
+    ctx.save();
+    ctx.fillStyle="rgba(0,10,18,.18)";ctx.beginPath();ctx.ellipse(pos.x,pos.ground,15*pos.scale,4*pos.scale,0,0,Math.PI*2);ctx.fill();
+    ctx.translate(pos.x,pos.y);ctx.scale(pos.scale,pos.scale);
+    ctx.globalAlpha=.35;ctx.drawImage(glowGold,-29,-29,58,58);ctx.globalAlpha=1;
+    var turn = REDUCED ? 1 : c.value === 5 ? .96 + .04 * Math.sin(tAnim * 3) : .72 + .28 * Math.sin(tAnim * 3 + c.id * .4);
+    drawCoinFace(turn, c.value);ctx.restore();
+  }
+  function drawCoinFace(turn, value) {
     ctx.save(); ctx.scale(turn,1);
     ctx.fillStyle="#b07d28";ctx.beginPath();ctx.ellipse(3,0,15,19,0,0,Math.PI*2);ctx.fill();
     ctx.fillStyle="#ffc64b";ctx.beginPath();ctx.ellipse(0,0,15,19,0,0,Math.PI*2);ctx.fill();
     ctx.strokeStyle="#fff1a3";ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,12,16,0,0,Math.PI*2);ctx.stroke();
-    ctx.fillStyle="#ba8124";ctx.beginPath();
-    for(var i=0;i<10;i++){var a=-Math.PI/2+i*Math.PI/5,sz=i%2?4:9;var px=Math.cos(a)*sz,py=Math.sin(a)*sz*1.18;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
-    ctx.closePath();ctx.fill();ctx.restore();
+    if (value === 5) {
+      ctx.fillStyle="#855015";ctx.font="900 13px " + FONT;ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText("X5",0,1);
+    } else {
+      ctx.fillStyle="#ba8124";ctx.beginPath();
+      for(var i=0;i<10;i++){var a=-Math.PI/2+i*Math.PI/5,sz=i%2?4:9;var px=Math.cos(a)*sz,py=Math.sin(a)*sz*1.18;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+      ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
   }
   function drawObstacle(o) {
       var r = rOf(o.p), x = sxAt(laneX(o.lane), r), y = yOf(r) + 36 * r;
@@ -1152,15 +1233,24 @@
   // ---------- Главный цикл ----------
   var last = 0;
   function frame(ts) {
-    var dt = last ? Math.min(0.05, (ts - last) / 1000) : 0;
+    var realDt = last ? Math.max(0, (ts - last) / 1000) : 0;
     last = ts;
-    if (!document.hidden && !paused) { update(dt); draw(); }
+    // Физика ограничивает шаг; таймер решения использует реальное активное время.
+    if (!document.hidden && !paused) { update(Math.min(0.05, realDt), realDt); draw(); }
     requestAnimationFrame(frame);
   }
 
   // ---------- Кнопки / UI ----------
   function setupUI() {
-    $("btn-play").addEventListener("click", function () { Sound.ensure(); startRun(); });
+    $("btn-play").addEventListener("click", openTutorial);
+    $("btn-tutorial-close").addEventListener("click", finishTutorial);
+    $("btn-tutorial-start").addEventListener("click", finishTutorial);
+    $("tutorial-overlay").addEventListener("keydown", function (event) {
+      if (event.key !== "Tab") return;
+      var first = $("btn-tutorial-close"), lastButton = $("btn-tutorial-start");
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); lastButton.focus(); }
+      else if (!event.shiftKey && document.activeElement === lastButton) { event.preventDefault(); first.focus(); }
+    });
     $("btn-again").addEventListener("click", function () { startRun(); });
     $("btn-pause").addEventListener("click", function () { setPaused(true); });
     $("btn-resume").addEventListener("click", function () { setPaused(false, true); });
@@ -1173,6 +1263,7 @@
       else if (!event.shiftKey && document.activeElement === lastButton) { event.preventDefault(); first.focus(); }
     });
     document.addEventListener("visibilitychange", function () { if (document.hidden && state === "run" && !paused) setPaused(true); });
+    window.addEventListener("pagehide", function () { if (state === "run" && !paused) setPaused(true); });
 
     var tgl = $("sound-toggle");
     tgl.addEventListener("change", function () { Sound.on = tgl.checked; Sound.ensure(); syncSoundBtn(); });
@@ -1186,23 +1277,14 @@
     $("sound-run").setAttribute("aria-pressed", String(Sound.on));
   }
 
-  // ---------- Фолбэк-контент (если fetch не сработал) ----------
-  var FALLBACK = {
-    actions: [{ id: "refuse", lane: 0, emoji: "🛑", label: "Отказать" }, { id: "check", lane: 1, emoji: "🔎", label: "Проверить" }, { id: "ok", lane: 2, emoji: "✅", label: "Можно" }],
-    difficulty: { startSpeed: 105, maxSpeed: 300, speedRampPerSec: 1.6, spawnGapStart: 2.4, spawnGapMin: 1.5, spawnGapRampPerSec: 0.008, lives: 3, runSpeedMultiplier: 1.5 },
-    situations: [
-      { icon: "🔢", text: "Назови код из СМС", answer: "refuse", why: "Код из СМС — секрет, его нельзя говорить никому.", visual: { type: "call", sender: "Номер не сохранён" } },
-      { icon: "🎁", text: "Ты выиграл приз!", answer: "refuse", why: "Приз, который ты не выигрывал, — ловушка.", visual: { type: "gift" } },
-      { icon: "🔗", text: "Перейди: sber-priz.xyz", answer: "check", why: "Странная ссылка — лучше проверить.", visual: { type: "browser", address: "sber-priz.xyz" } },
-      { icon: "🍽️", text: "Мама зовёт ужинать", answer: "ok", why: "Обычная просьба близкого — всё хорошо.", visual: { type: "call", sender: "Мама" } }
-    ]
-  };
-
   // ---------- Инициализация ----------
   window.addEventListener("resize", resize);
-  resize();
+  // Пересобирать раскладку, когда контейнер получает реальный размер (скрытая вкладка/превью → видимый).
+  try {
+    if (window.ResizeObserver) { new ResizeObserver(function () { resize(); }).observe($("app")); }
+  } catch (e) {}
+  try { resize(); } catch (e) { /* не даём краху раскладки оборвать инициализацию */ }
   setupInput();
   setupUI();
-  loadContent();
-  requestAnimationFrame(frame);
+  if (loadContent()) requestAnimationFrame(frame);
 })();

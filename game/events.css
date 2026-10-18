@@ -1,6 +1,6 @@
 /* Компактные предметные события в светлой палитре matvey-v2. */
 .event-stage { position:absolute; z-index:4; top:calc(env(safe-area-inset-top) + 60px); left:50%; width:min(352px, calc(100% - 24px)); transform:translateX(-50%); pointer-events:none; color:#effff8; font-family:inherit; }
-.ev-shell { position:relative; border:1px solid #358573; border-radius:18px; background:linear-gradient(130deg,rgba(17,49,53,.98),rgba(9,28,38,.98)); box-shadow:0 8px 24px #030e1655,inset 0 1px #bbffde12; animation:ev-arrive .32s ease-out both; }
+.ev-shell { position:relative; border:1px solid #358573; border-radius:18px; background:linear-gradient(130deg,rgba(17,49,53,.98),rgba(9,28,38,.98)); box-shadow:0 8px 24px #030e1655,inset 0 1px #bbffde12; }
 .ev-scene { display:flex; align-items:center; gap:12px; padding:13px 14px 13px 10px; min-height:108px; }
 .ev-art { width:68px; height:76px; flex:none; position:relative; display:grid; place-items:center; color:#94edd5; }
 .ev-art:before { content:""; position:absolute; width:66px; height:66px; border-radius:50%; background:radial-gradient(circle,#00c1a01f,transparent 72%); }
@@ -12,7 +12,7 @@
 .ev-timing { padding:7px 9px 0; display:flex; gap:8px; align-items:center; }
 .ev-timing>div { height:3px; flex:1; overflow:hidden; border-radius:3px; background:#8affd326; }
 .ev-timing span { display:block; height:100%; background:#77e3bb; transform-origin:left; }
-.ev-timing small { font-size:10px; color:#c1d6d7; text-shadow:0 1px 3px #001b22; }
+.ev-timing small { font-size:13.5px; font-weight:800; color:#c1d6d7; text-shadow:0 1px 3px #001b22; }
 .ev-result { position:absolute; inset:0; border-radius:inherit; background:#103d35ed; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800; font-size:15px; color:#b2f6cd; }
 .ev-result[hidden] { display:none; }
 .ev-miss .ev-result { background:#3a3020ed; color:#ffe0a0; }
@@ -83,3 +83,7 @@
 .ev-wallet { color:#6e4ec0; border-color:#c5a9ef; background:#eee4ff; }.ev-transfer { background:#fff8dc; }
 .ev-window { background:#ece7ff; border-color:#b7a6e6; }.ev-window>i { border-color:#cfc3ef; background:#dfd5ff; }
 .ev-notice { background:#e8e2ff; border-color:#bda6f4; }.ev-notice i { border-color:#fff; }.ev-big-coin { background:#ffd23f; color:#fff6bb; border-color:#f5b800; box-shadow:3px 0 #d99a00; }.ev-coin-shadow { background:#7760b733; }
+.ev-shopping-bag { position:absolute; width:39px; height:38px; left:9px; top:28px; border:2px solid #ae98e4; border-radius:5px 5px 9px 9px; background:#ede5ff; transform:rotate(-7deg); }
+.ev-shopping-bag i { position:absolute; width:17px; height:13px; left:9px; top:-11px; border:2px solid #ae98e4; border-bottom:0; border-radius:10px 10px 0 0; }
+.ev-price-tag { position:absolute; display:grid; place-items:center; width:42px; height:45px; right:1px; top:9px; color:#7350ff; background:#fff4c5; border:2px solid #ffd75f; border-radius:10px; transform:rotate(8deg); animation:ev-wiggle 3s ease-in-out infinite; }
+.ev-price-tag .ev-icon { width:28px; height:28px; }
