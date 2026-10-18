@@ -7,11 +7,10 @@
     super: { name: "Суперредкая", color: "#d5acff" },
     mega: { name: "Мегаредкая", color: "#ffdc83" }
   };
-  var chests = [
-    { id: "wood", name: "Деревянный сундук", price: 150, odds: [{ rarity: "uncommon", chance: 90 }, { rarity: "rare", chance: 10 }] },
-    { id: "silver", name: "Серебряный сундук", price: 450, odds: [{ rarity: "rare", chance: 75 }, { rarity: "super", chance: 25 }] },
-    { id: "gold", name: "Золотой сундук", price: 900, odds: [{ rarity: "super", chance: 90 }, { rarity: "mega", chance: 10 }] }
-  ];
+  // Цена персонажа зависит только от редкости. Никакой случайности и ставок:
+  // ребёнок сам выбирает, кого купить, и получает ровно его (не азарт — обычная витрина).
+  var prices = { uncommon: 150, rare: 300, super: 600, mega: 900 };
+  function priceOf(pet) { return prices[pet.rarity]; }
   var pets = [
     { id: "listik", name: "Листик", rarity: "uncommon", kind: "leaf", color: "#77d98b", accent: "#297a58", bio: "Лесной ушастик выращивает дерево желаний по одному листочку.", skill: "Копим понемногу", tip: "Выбери мечту и откладывай на неё часть карманных денег. Даже маленькие суммы складываются!" },
     { id: "kaplik", name: "Каплик", rarity: "uncommon", kind: "water", color: "#71d9ed", accent: "#3679bd", bio: "Водяной малыш собирает капельки и считает каждую.", skill: "Считаем расходы", tip: "Записывай, сколько денег получил и потратил. Так легче понять, сколько осталось." },
@@ -30,17 +29,6 @@
     { id: "fenikash", name: "Феникаш", rarity: "mega", kind: "phoenix", color: "#ffc18b", accent: "#d56b78", bio: "Радужный феникс превращает промахи в новые полезные привычки.", skill: "Учимся на ошибках", tip: "Потратил деньги и пожалел? Расскажи взрослому и подумай, что сделаешь иначе в следующий раз. Ошибки помогают учиться." },
     { id: "shchitorn", name: "Щиторн", rarity: "mega", kind: "unicorn", color: "#dfd7ff", accent: "#9c7cca", bio: "Единорог со щитом зовёт команду, когда одному трудно разобраться.", skill: "Обращаемся за помощью", tip: "Если речь о деньгах и что-то непонятно или тревожно, спроси взрослого, которому доверяешь. Просить помощи — полезный навык." }
   ];
-
-  function roll(chest, random) {
-    random = random || Math.random;
-    var value = random() * 100, total = 0, rarity = chest.odds[chest.odds.length - 1].rarity;
-    for (var i = 0; i < chest.odds.length; i++) {
-      total += chest.odds[i].chance;
-      if (value < total) { rarity = chest.odds[i].rarity; break; }
-    }
-    var pool = pets.filter(function (pet) { return pet.rarity === rarity; });
-    return pool[Math.floor(random() * pool.length)];
-  }
 
   function art(pet) {
     var extra = {
@@ -88,11 +76,13 @@
   function createWallet() {
     var wallet = { balance: 0, pets: [], pending: null };
     wallet.begin = function (coins) { wallet.balance = Math.max(0, Math.floor(coins || 0)); wallet.pets = []; wallet.pending = null; };
-    wallet.buy = function (id, random) {
-      var chest = chests.find(function (c) { return c.id === id; });
-      if (!chest || wallet.pending || wallet.balance < chest.price) return null;
-      var pet = roll(chest, random);
-      wallet.balance -= chest.price; wallet.pending = { pet: pet, chest: chest };
+    wallet.owns = function (id) { return wallet.pets.some(function (p) { return p.id === id; }); };
+    // Покупка конкретного выбранного персонажа. Без случайности: получаешь ровно того,
+    // кого выбрал. Нельзя купить дважды, нельзя уйти в минус, нельзя списать во время показа.
+    wallet.buy = function (id) {
+      var pet = pets.find(function (p) { return p.id === id; });
+      if (!pet || wallet.pending || wallet.owns(id) || wallet.balance < priceOf(pet)) return null;
+      wallet.balance -= priceOf(pet); wallet.pending = { pet: pet };
       return wallet.pending;
     };
     wallet.reveal = function () {
@@ -101,7 +91,7 @@
     };
     return wallet;
   }
-  var api = { rarities: rarities, chests: chests, pets: pets, roll: roll, art: art, createWallet: createWallet };
+  var api = { rarities: rarities, prices: prices, priceOf: priceOf, pets: pets, art: art, createWallet: createWallet };
   if (typeof module === "object" && module.exports) module.exports = api;
   else window.RunRewards = api;
 })();

@@ -1,0 +1,3361 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <link rel="icon" href="data:," />
+  <title>Не попадись!</title>
+  <style>
+/* «Не попадись!» — оформление в стиле «Облака»: пастельное небо, белые карточки-наклейки,
+   мягкие «пластиковые» тени. Только системные шрифты, без внешних ресурсов. */
+:root {
+  --sky1: #6ec1ff;
+  --sky2: #a9dcff;
+  --sky3: #e4f5ff;
+  --ink: #23246a;
+  --ink-2: #5b5f9c;
+  --muted: #8c90bd;
+  --violet: #7350ff;
+  --violet-2: #5432e6;
+  --violet-soft: #ece6ff;
+  --sun: #ffd23f;
+  --sun-2: #f5b800;
+  --tile: #ffffff;
+  --tile-lip: #cdd8ee;
+  /* дорожки-действия */
+  --refuse: #ff4d6d;   --refuse-d: #d42a4c;
+  --check: #7350ff;    --check-d: #4a2bd0;
+  --ok: #22c37a;       --ok-d: #12965a;
+  --sber-green: #21a038;
+  --card-sh: 0 4px 0 rgba(35,36,106,0.14), 0 8px 18px rgba(35,80,160,0.14);
+  font-family: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  background: linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 42%, var(--sky3) 100%);
+  color: var(--ink);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+input { -webkit-user-select: text; user-select: text; }
+button { font-family: inherit; }
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--sky2);
+}
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hidden { display: none !important; }
+
+/* ---------- Кнопки ---------- */
+.btn-primary {
+  border: none;
+  background: linear-gradient(180deg, #ffe066, var(--sun) 55%, var(--sun-2));
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 900;
+  padding: 16px 46px;
+  border-radius: 20px;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,0.7), 0 6px 0 #d99a00, 0 12px 22px rgba(217,154,0,0.35);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.btn-primary:active { transform: translateY(4px); box-shadow: inset 0 2px 0 rgba(255,255,255,0.7), 0 2px 0 #d99a00, 0 6px 12px rgba(217,154,0,0.3); }
+.btn-secondary {
+  border: none;
+  background: var(--tile);
+  color: var(--ink);
+  font-size: 16px; font-weight: 900;
+  padding: 14px 26px;
+  border-radius: 18px;
+  box-shadow: var(--card-sh);
+  cursor: pointer;
+  transition: transform 0.08s ease;
+}
+.btn-secondary:active { transform: translateY(3px); }
+.btn-text {
+  border: none; background: none; color: var(--ink-2);
+  font-size: 14px; font-weight: 800; text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer; padding: 8px;
+}
+.btn-primary:focus-visible, .btn-secondary:focus-visible, .icon-btn:focus-visible, .lane-btn:focus-visible { outline: 3px solid var(--violet); outline-offset: 3px; }
+
+/* ---------- HUD ---------- */
+.hud {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: calc(env(safe-area-inset-top) + 12px) 12px 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.hud-left, .hud-right { display: flex; gap: 8px; align-items: center; }
+.hud-chip {
+  background: var(--tile);
+  color: var(--ink);
+  font-weight: 900;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  padding: 7px 13px;
+  border-radius: 14px;
+  display: flex; align-items: center; gap: 6px;
+  box-shadow: var(--card-sh);
+}
+.coin-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c4, var(--sun) 55%, var(--sun-2));
+  box-shadow: inset 0 -2px 0 rgba(180,110,0,0.35);
+}
+.hud-chip.coins.pop { animation: chipPop 0.28s ease-out; }
+.hud-chip.combo { background: linear-gradient(180deg, #ffe066, var(--sun-2)); color: var(--ink); box-shadow: 0 4px 0 #d99a00, 0 8px 16px rgba(217,154,0,0.3); }
+.hud-chip.combo.pop { animation: chipPop 0.4s cubic-bezier(.2,1.6,.4,1); }
+@keyframes chipPop { 0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); } }
+.lives { display:flex; gap:2px; padding:5px 8px; background:var(--tile); border-radius:14px; box-shadow:var(--card-sh); }
+.life { position:relative; display:block; width:22px; height:26px; flex:none; }
+.life svg { display:block; width:100%; height:100%; }
+.life.lost .life-icon { opacity:.2; filter:grayscale(1); }
+.lives.hit { background:#fff0f4; box-shadow:0 0 0 2px #ff85a2,0 4px 0 #d42a4c26; animation:shieldPanel .7s ease-out; }
+.life.pop::after { content:""; position:absolute; inset:-6px; border:3px solid #ff85a2; border-radius:50%; animation:shieldRing .65s ease-out both; }
+.life-shard { position:absolute; inset:0; animation:shieldBreak .8s cubic-bezier(.15,.7,.35,1) both; }
+.shard-0 { clip-path:polygon(0 0,55% 0,48% 47%,0 52%); --dx:-14px; --dy:-12px; --turn:-35deg; }
+.shard-1 { clip-path:polygon(55% 0,100% 0,100% 52%,48% 47%); --dx:15px; --dy:-10px; --turn:40deg; }
+.shard-2 { clip-path:polygon(0 52%,48% 47%,55% 100%,0 100%); --dx:-11px; --dy:19px; --turn:-55deg; }
+.shard-3 { clip-path:polygon(48% 47%,100% 52%,100% 100%,55% 100%); --dx:14px; --dy:21px; --turn:50deg; }
+@keyframes shieldBreak { 0%,12% { opacity:1; transform:scale(1.25); filter:brightness(1.35); } 65% { opacity:1; } 100% { opacity:0; transform:translate(var(--dx),var(--dy)) rotate(var(--turn)) scale(.55); } }
+@keyframes shieldRing { from { opacity:.9; transform:scale(.5); } to { opacity:0; transform:scale(1.7); } }
+@keyframes shieldPanel { 0%,100% { transform:scale(1); } 22% { transform:scale(1.1); } 50% { transform:scale(.98); } }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+@media (max-width:360px) { .life { width:18px; height:22px; } }
+@media (prefers-reduced-motion:reduce) { .life.pop::after,.life-shard { display:none; } }
+.icon-btn {
+  pointer-events: auto;
+  border: none;
+  background: var(--tile);
+  width: 40px; height: 40px;
+  border-radius: 14px;
+  font-size: 18px;
+  box-shadow: var(--card-sh);
+  cursor: pointer;
+}
+
+/* ---------- Нижняя панель: три кнопки-дорожки ---------- */
+.lane-legend {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  justify-content: space-around;
+  z-index: 5;
+  padding: 14px 10px calc(env(safe-area-inset-bottom) + 12px);
+  background: rgba(255,255,255,0.78);
+  border-top: 2px solid #fff;
+  box-shadow: 0 -6px 20px rgba(35,80,160,0.12);
+  border-radius: 26px 26px 0 0;
+}
+.lane-btn {
+  flex: 1;
+  border: none; background: none; padding: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  color: var(--ink); font-size: 13.5px; font-weight: 900;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.lane-btn .lb-circle {
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.14s cubic-bezier(.2,1.5,.4,1);
+}
+.lane-btn .lb-circle svg { width: 30px; height: 30px; }
+.lane-btn[data-lane="0"] .lb-circle { background: linear-gradient(180deg, #ff7a92, var(--refuse)); box-shadow: inset 0 3px 0 rgba(255,255,255,0.45), 0 6px 0 var(--refuse-d), 0 10px 16px rgba(212,42,76,0.3); }
+.lane-btn[data-lane="1"] .lb-circle { background: linear-gradient(180deg, #8f75ff, var(--check)); box-shadow: inset 0 3px 0 rgba(255,255,255,0.45), 0 6px 0 var(--check-d), 0 10px 16px rgba(74,43,208,0.3); }
+.lane-btn[data-lane="2"] .lb-circle { background: linear-gradient(180deg, #4fdc98, var(--ok)); box-shadow: inset 0 3px 0 rgba(255,255,255,0.45), 0 6px 0 var(--ok-d), 0 10px 16px rgba(18,150,90,0.3); }
+.lane-btn:active .lb-circle { transform: translateY(4px); }
+.lane-btn.active .lb-circle { transform: translateY(-3px) scale(1.08); }
+.lane-btn .lb-label { padding: 2px 10px; border-radius: 999px; transition: background 0.12s ease, color 0.12s ease; }
+.lane-btn.active .lb-label { background: var(--ink); color: #fff; }
+
+/* ---------- Подсказка «почему» при ошибке ---------- */
+.flash {
+  position: absolute;
+  left: 14px; right: 14px;
+  top: calc(env(safe-area-inset-top) + 68px);
+  z-index: 8;
+  background: var(--tile);
+  color: var(--ink);
+  border-radius: 22px;
+  padding: 16px 16px 14px;
+  font-size: 15.5px;
+  font-weight: 800;
+  line-height: 1.32;
+  text-align: center;
+  box-shadow: 0 5px 0 rgba(35,36,106,0.16), 0 14px 28px rgba(35,80,160,0.22);
+  animation: flashIn 0.18s cubic-bezier(.2,1.4,.4,1);
+}
+.flash::before {
+  content: "Ой!"; position: absolute; top: -12px; left: 16px;
+  background: var(--refuse); color: #fff; font-size: 13px; font-weight: 900;
+  padding: 3px 12px; border-radius: 10px; box-shadow: 0 3px 0 var(--refuse-d);
+}
+.flash .flash-icon { font-size: 26px; display: block; margin-bottom: 2px; }
+.flash .flash-villain { font-weight: 900; color: var(--refuse-d); margin-bottom: 4px; }
+.flash .flash-ans { margin-top: 10px; padding: 7px 10px; border-radius: 12px; background: var(--violet-soft); color: var(--violet-2); font-size: 14.5px; font-weight: 900; }
+@keyframes flashIn { from { opacity: 0; transform: translateY(-10px) scale(0.95); } to { opacity: 1; transform: none; } }
+
+/* ---------- Экраны ---------- */
+.screen {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px);
+  background: linear-gradient(180deg, rgba(110,193,255,0.5) 0%, rgba(169,220,255,0.6) 45%, rgba(228,245,255,0.88) 100%);
+  color: var(--ink);
+  text-align: center;
+  overflow-y: auto;
+  touch-action: pan-y;
+}
+.screen > :first-child { margin-top: auto; }
+.screen > :last-child { margin-bottom: auto; }
+
+.brand { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.logo-badge {
+  width: 92px; height: 92px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #5fe08a, var(--sber-green) 62%, #13782a);
+  box-shadow: inset 0 -6px 0 rgba(0,0,0,0.12), 0 14px 22px rgba(35,80,160,0.25);
+  display: flex; align-items: center; justify-content: center;
+  animation: badgeIn 0.5s cubic-bezier(.2,1.5,.4,1) both, floaty 2.6s ease-in-out 0.5s infinite;
+}
+@keyframes badgeIn { from { transform: scale(0.3) rotate(-14deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes floaty { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-7px) rotate(2deg); } }
+@keyframes riseIn { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Объёмный заголовок: белая заливка + фиолетовая «выдавленная» тень */
+.game-title {
+  margin: 6px 0 0;
+  font-size: 42px;
+  line-height: 1.02;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: #fff;
+  text-shadow:
+    0 2px 0 var(--violet-2), 0 4px 0 var(--violet-2), 0 6px 0 #3f22b8,
+    2px 0 0 var(--violet-2), -2px 0 0 var(--violet-2), 0 -2px 0 var(--violet-2),
+    0 12px 18px rgba(35,36,106,0.25);
+  animation: riseIn 0.4s ease-out 0.12s both;
+}
+.game-title .accent {
+  display: block;
+  color: var(--sun);
+  text-shadow:
+    0 2px 0 #e07a00, 0 4px 0 #e07a00, 0 6px 0 #b85f00,
+    2px 0 0 #e07a00, -2px 0 0 #e07a00, 0 -2px 0 #e07a00,
+    0 12px 18px rgba(184,95,0,0.25);
+}
+.subtitle {
+  margin: 6px 0 0; color: var(--ink); font-size: 14.5px; font-weight: 800;
+  background: var(--tile); padding: 8px 16px; border-radius: 999px; box-shadow: var(--card-sh);
+  animation: riseIn 0.4s ease-out 0.2s both;
+}
+
+.howto {
+  background: rgba(255,255,255,0.9);
+  border: 2px solid #fff;
+  border-radius: 24px;
+  padding: 14px 14px 12px;
+  width: 100%;
+  max-width: 350px;
+  text-align: left;
+  box-shadow: var(--card-sh);
+  animation: riseIn 0.4s ease-out 0.28s both;
+}
+.howto-title { margin: 0 0 8px 4px; font-weight: 900; font-size: 15px; color: var(--ink); }
+.howto-row { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink-2); margin: 8px 0; line-height: 1.28; font-weight: 700; animation: riseIn 0.35s ease-out both; }
+.howto-row .he { flex: 0 0 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.howto-row .he svg { width: 17px; height: 17px; }
+.howto-row b { color: var(--ink); font-weight: 900; }
+.howto-row.r0 { animation-delay: 0.34s; } .howto-row.r0 .he { background: var(--refuse); box-shadow: 0 3px 0 var(--refuse-d); }
+.howto-row.r1 { animation-delay: 0.42s; } .howto-row.r1 .he { background: var(--check); box-shadow: 0 3px 0 var(--check-d); }
+.howto-row.r2 { animation-delay: 0.5s; }  .howto-row.r2 .he { background: var(--ok); box-shadow: 0 3px 0 var(--ok-d); }
+
+#btn-play { animation: riseIn 0.4s ease-out 0.55s both, pulse 1.6s ease-in-out 1s infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+.sound-toggle { display: flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 800; font-size: 14px; cursor: pointer; position: relative; }
+.sound-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.sound-toggle .pill { width: 52px; height: 30px; border-radius: 999px; background: #d9e2f3; box-shadow: inset 0 2px 4px rgba(35,36,106,0.15); position: relative; transition: background 0.18s; }
+.sound-toggle .pill::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 0 rgba(35,36,106,0.15); transition: transform 0.18s cubic-bezier(.2,1.5,.4,1); }
+.sound-toggle input:checked + .pill { background: var(--ok); }
+.sound-toggle input:checked + .pill::after { transform: translateX(22px); }
+.sound-toggle .pill svg { position:absolute; left:8px; top:8px; width:15px; height:15px; fill:currentColor; z-index:1; transition:transform .18s; }
+.sound-toggle input:checked + .pill svg { transform:translateX(22px); }
+.sound-toggle input:focus-visible + .pill { outline: 3px solid var(--violet); outline-offset: 2px; }
+.sound-lbl { color: var(--ink); }
+.hint { color: var(--ink-2); font-size: 12.5px; font-weight: 700; margin: 0; }
+
+/* ---------- Экран итога ---------- */
+.end-title {
+  font-size: 32px; font-weight: 900; margin: 0; color: #fff;
+  text-shadow: 0 2px 0 var(--violet-2), 0 4px 0 var(--violet-2), 2px 0 0 var(--violet-2), -2px 0 0 var(--violet-2), 0 -2px 0 var(--violet-2), 0 10px 16px rgba(35,36,106,0.22);
+  animation: riseIn 0.35s ease-out both;
+}
+.end-stats { display: flex; gap: 10px; width: 100%; max-width: 360px; }
+.stat { flex: 1; background: var(--tile); border-radius: 18px; padding: 12px 6px 10px; box-shadow: var(--card-sh); animation: riseIn 0.4s ease-out both; }
+.stat:nth-child(2) { animation-delay: 0.1s; }
+.stat:nth-child(3) { animation-delay: 0.2s; }
+.stat-num { font-size: 26px; min-height: 30px; font-variant-numeric: tabular-nums; font-weight: 900; color: var(--violet); }
+.stat-lbl { font-size: 12px; color: var(--ink-2); font-weight: 800; margin-top: 2px; min-height: 28px; }
+
+.end-verdict { font-size: 16px; font-weight: 800; color: var(--ink); max-width: 340px; min-height: 44px; animation: riseIn 0.4s ease-out 0.5s both; }
+
+/* ---------- Загрузка ---------- */
+#screen-loading { gap: 14px; font-weight: 800; }
+.loader {
+  width: 46px; height: 46px;
+  border: 5px solid rgba(255,255,255,0.85);
+  border-top-color: var(--violet);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-height: 700px) {
+  .game-title { font-size: 34px; }
+  .logo-badge { width: 70px; height: 70px; }
+  .logo-badge svg { width: 42px; height: 42px; }
+  .howto { padding: 10px 12px; }
+  .lane-btn .lb-circle { width: 58px; height: 58px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+
+/* Адаптация локального раннера к визуальному языку matvey-v2. */
+#screen-start { justify-content:space-between; padding-top:calc(env(safe-area-inset-top) + 38px); background:linear-gradient(180deg,#6ec1ff88, #a9dcff22 32%,transparent 50%,#e4f5ffdd); }
+#screen-start > :first-child,#screen-start > :last-child { margin:0; }
+#screen-start .game-title { font-size:48px; }
+.start-stage { flex:1; min-height:70px; }
+.start-bottom { display:flex; flex-direction:column; align-items:center; gap:16px; width:100%; }
+#screen-start #btn-play { min-width:220px; }
+#screen-end { gap:25px; background:linear-gradient(180deg,#b8e3ffe6,#e9f6fff2); }
+#screen-end .end-title { font-size:32px; margin-bottom:3px; }
+#screen-end .end-stats { gap:9px; }
+#screen-end .stat { min-width:0; padding:19px 5px 15px; border:2px solid #fff; }
+#screen-end .stat-num { font-size:clamp(23px,6vw,30px); }
+#screen-end .stat-lbl { min-height:32px; line-height:1.3; }
+#screen-end .end-verdict { margin:0; font-size:16px; line-height:1.45; max-width:305px; min-height:0; }
+#btn-again { width:100%; max-width:310px; font-size:19px; padding-inline:18px; }
+.hud-chip { white-space:nowrap; }
+.hud-chip.combo { position:absolute; top:128px; right:14px; font-size:12px; }
+.lives { min-height:36px; align-items:center; }
+.lane-legend { pointer-events:auto; }
+@media (max-height:700px) { #screen-start { padding-top:22px; padding-bottom:18px; }.start-bottom { gap:12px; }#screen-start .game-title { font-size:39px; }.lane-btn .lb-circle { width:52px; height:52px; }.lane-legend { padding-top:10px; }.lane-btn { gap:5px; } }
+@media (max-width:360px) { .hud-left,.hud-right { gap:5px; }.hud-chip { padding:7px 8px; font-size:13px; }.lives { font-size:16px; padding:6px; }.icon-btn { width:36px; height:36px; }#screen-end { padding-inline:16px; }.stat-lbl { font-size:11px; } }
+
+/* Two compact HUD rows keep the pause and sound controls easy to tap. */
+.hud { display:grid; grid-template-columns:1fr auto; gap:6px 8px; }
+.hud-left,.hud-right { gap:6px; }
+.hud-health { grid-column:1/-1; display:flex; align-items:center; gap:8px; }
+.hud-health .lives { min-height:28px; padding:3px 8px; }
+.hud-health .life { width:18px; height:22px; }
+.hud-health .combo { padding:3px 9px; font-size:13px; }
+.icon-btn svg { display:block; width:24px; height:24px; fill:currentColor; }
+#sound-run,#btn-pause { width:40px; height:40px; display:grid; place-items:center; color:var(--ink); }
+#btn-pause { color:var(--violet); }
+#event-stage.event-stage { top:calc(env(safe-area-inset-top) + 96px); }
+#app.is-paused .hud *,#app.is-paused .event-stage * { animation-play-state:paused!important; }
+@media(max-width:360px) { .hud-chip { font-size:13px; }.hud-health .life { width:17px; height:21px; } }
+
+/* ---------- Разбор ошибок на финише ---------- */
+.end-review { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 7px; animation: riseIn 0.4s ease-out 0.55s both; }
+.review-title { margin: 2px 0 1px; font-size: 13px; font-weight: 800; color: var(--ink-2); }
+.review-allgood { margin: 0; font-size: 14.5px; font-weight: 800; color: var(--ok-d); background: #e6fff2; border: 2px solid #b6f0d2; border-radius: 14px; padding: 10px 12px; }
+.review-item { display: block; width: 100%; text-align: left; background: var(--tile); border: 2px solid #ffd7df; border-left: 5px solid var(--refuse); border-radius: 14px; padding: 9px 12px; cursor: pointer; box-shadow: 0 3px 0 rgba(35,36,106,0.08); font: inherit; }
+.review-item .ri-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 14px; font-weight: 800; color: var(--ink); }
+.review-item .ri-text { flex: 1; min-width: 0; }
+.review-safe { font-size: 10.5px; font-weight: 800; color: #9a6b00; background: #fff0c7; border-radius: 999px; padding: 2px 8px; }
+.review-item .ri-why { display: none; margin-top: 7px; font-size: 13px; line-height: 1.38; color: var(--ink-2); }
+.review-item .ri-why b { color: var(--ok-d); font-weight: 900; }
+.review-item.open { border-color: #cfe9d8; border-left-color: var(--ok); }
+.review-item.open .ri-why { display: block; }
+
+/* Кнопка «Играть»: приглашающий пульс затухает (не дёргается бесконечно) */
+#btn-play { animation: riseIn 0.4s ease-out 0.55s both, pulse 1.6s ease-in-out 1s 4; }
+@media (prefers-reduced-motion: reduce) {
+  #btn-play { animation: riseIn 0.4s ease-out 0.55s both; }
+  .badge, .end-review { animation: none; }
+}
+.review-neutral { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink-2); background: #eef3ff; border: 2px solid #d7e2ff; border-radius: 14px; padding: 10px 12px; }
+
+/* Блокировка фона диалога и в WebView без inert. */
+.input-blocked { pointer-events:none !important; }
+
+/* Короткое обучение перед первым забегом; вся графика встроена. */
+#tutorial-overlay { padding:16px; padding-top:max(16px,env(safe-area-inset-top)); padding-bottom:max(16px,env(safe-area-inset-bottom)); }
+.tutorial-card { position:relative; width:100%; max-width:380px; max-height:100%; overflow-y:auto; padding:25px 16px 15px; border:3px solid #fff; border-radius:28px; background:#f8fbff; box-shadow:0 7px 0 #abafd9,0 16px 40px #28225035; text-align:center; }
+.tutorial-close { position:absolute; top:7px; right:7px; display:grid; place-items:center; width:44px; height:44px; border:0; border-radius:15px; background:var(--violet-soft); color:var(--violet); cursor:pointer; }
+.tutorial-close svg { width:25px; height:25px; fill:none; stroke:currentColor; stroke-width:3; stroke-linecap:round; }
+.tutorial-close:focus-visible { outline:3px solid var(--violet); outline-offset:2px; }
+.tutorial-card h2 { margin:0 28px 3px; font-size:27px; line-height:1.2; font-weight:900; }
+#tutorial-subtitle { margin:0 0 17px; color:var(--ink-2); font-size:14px; }
+.tutorial-moves { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.tutorial-step { min-width:0; padding:4px 3px 12px; border-radius:18px; background:#eee8ff; }
+.tutorial-step:nth-child(2) { background:#fff4d3; }
+.tutorial-art { display:block; width:100%; height:116px; }
+.tutorial-step strong,.tutorial-step span { display:block; }
+.tutorial-step strong { margin:3px 0 5px; font-size:13px; line-height:1.25; font-weight:850; }
+.tutorial-step span { font-size:13px; font-weight:750; color:var(--ink-2); }
+.tutorial-answer { margin:13px 0 16px; padding:13px 5px 11px; border-radius:18px; background:#edf5ff; }
+.tutorial-answer>strong { display:block; font-size:15px; line-height:1.25; }
+.tutorial-choices { display:flex; justify-content:space-around; gap:4px; margin:11px 0 10px; }
+.tutorial-choices span { display:flex; flex:1; flex-direction:column; align-items:center; gap:5px; font-size:11px; font-weight:800; }
+.tutorial-choices i { display:grid; place-items:center; width:34px; height:34px; border-radius:12px; color:white; font-size:29px; line-height:1; font-style:normal; font-weight:900; box-shadow:0 3px 0 #23246a18; }
+.tutorial-no { background:var(--refuse); }.tutorial-check { background:var(--check); }.tutorial-yes { background:var(--ok); }
+.tutorial-check svg { width:24px; height:24px; fill:none; stroke:#fff; stroke-width:3; stroke-linecap:round; }
+#btn-tutorial-start { width:100%; padding:13px 20px; font-size:20px; }
+.tutorial-keyboard { margin:14px 0 0; color:var(--ink-2); font-size:11px; }
+.tutorial-dodge { animation:tutorialDodge 2.8s ease-in-out infinite; }
+.tutorial-jump { animation:tutorialJump 2.8s ease-in-out infinite; }
+@keyframes tutorialDodge { 0%,10%,90%,100% { transform:translateX(0); } 35%,65% { transform:translateX(-32px); } }
+@keyframes tutorialJump { 0%,15%,85%,100% { transform:translateY(20px); } 45%,55% { transform:translateY(-15px); } }
+@media (max-height:620px) { .tutorial-card { padding-top:20px; }.tutorial-art { height:92px; }#tutorial-subtitle { margin-bottom:10px; }.tutorial-answer { margin:10px 0 12px; padding:10px 4px; }.tutorial-keyboard { margin-top:12px; } }
+@media (prefers-reduced-motion:reduce) { .tutorial-dodge,.tutorial-jump { animation:none; }.tutorial-dodge { transform:translateX(-32px); }.tutorial-jump { transform:translateY(-15px); } }
+
+</style>
+  <style>
+/* Компактные предметные события в светлой палитре matvey-v2. */
+.event-stage { position:absolute; z-index:4; top:calc(env(safe-area-inset-top) + 60px); left:50%; width:min(352px, calc(100% - 24px)); transform:translateX(-50%); pointer-events:none; color:#effff8; font-family:inherit; }
+.ev-shell { position:relative; border:1px solid #358573; border-radius:18px; background:linear-gradient(130deg,rgba(17,49,53,.98),rgba(9,28,38,.98)); box-shadow:0 8px 24px #030e1655,inset 0 1px #bbffde12; }
+.ev-scene { display:flex; align-items:center; gap:12px; padding:13px 14px 13px 10px; min-height:108px; }
+.ev-art { width:68px; height:76px; flex:none; position:relative; display:grid; place-items:center; color:#94edd5; }
+.ev-art:before { content:""; position:absolute; width:66px; height:66px; border-radius:50%; background:radial-gradient(circle,#00c1a01f,transparent 72%); }
+.ev-copy { min-width:0; flex:1; }
+.ev-eyebrow { color:#83cdbb; font-size:10px; line-height:1.25; text-transform:uppercase; font-weight:750; letter-spacing:1px; }
+.ev-sender { color:#adbfca; font-size:11px; line-height:1.25; margin-top:3px; overflow-wrap:anywhere; }
+.ev-words { margin:6px 0 0; font-size:16px; line-height:1.3; font-weight:750; overflow-wrap:anywhere; }
+.ev-icon { display:block; width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.ev-timing { padding:7px 9px 0; display:flex; gap:8px; align-items:center; }
+.ev-timing>div { height:3px; flex:1; overflow:hidden; border-radius:3px; background:#8affd326; }
+.ev-timing span { display:block; height:100%; background:#77e3bb; transform-origin:left; }
+.ev-timing small { font-size:13.5px; font-weight:800; color:#c1d6d7; text-shadow:0 1px 3px #001b22; }
+.ev-result { position:absolute; inset:0; border-radius:inherit; background:#103d35ed; display:flex; align-items:center; justify-content:center; gap:8px; font-weight:800; font-size:15px; color:#b2f6cd; }
+.ev-result[hidden] { display:none; }
+.ev-miss .ev-result { background:#3a3020ed; color:#ffe0a0; }
+.ev-phone { width:39px; height:68px; position:relative; z-index:1; border:2px solid #88b5b1; border-radius:10px; background:linear-gradient(145deg,#244b52,#102c38); box-shadow:3px 4px #061921; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; animation:ev-wiggle 2.4s ease-in-out infinite; }
+.ev-speaker { position:absolute; top:4px; width:13px; height:2px; border-radius:2px; background:#78a29f; }
+.ev-avatar { display:grid; place-items:center; width:26px; height:26px; border-radius:50%; background:#a2f3d51a; }
+.ev-avatar .ev-icon { width:20px; height:20px; }
+.ev-receiver { background:#21a038; padding:3px; border-radius:50%; }
+.ev-receiver .ev-icon { width:10px; height:10px; color:#d8ffe6; }
+.ev-ring { position:absolute; border:1px solid #56ccb2; border-radius:22px; width:44px; height:58px; opacity:0; animation:ev-ring 2.4s ease-out infinite; }
+.ev-ring.r2 { animation-delay:.35s; }
+.ev-chat-back { width:39px; height:29px; position:absolute; left:7px; top:14px; border-radius:9px 9px 9px 2px; background:#274853; border:1px solid #608c96; }
+.ev-chat-front { position:relative; width:48px; height:37px; margin:16px 0 0 9px; border-radius:10px 10px 3px 10px; background:#195647; border:1px solid #6bd3ac; display:flex; align-items:flex-end; justify-content:center; gap:3px; padding-bottom:6px; animation:ev-message 3s ease-out infinite; }
+.ev-chat-front .ev-icon { width:18px; height:18px; position:absolute; left:7px; top:4px; }
+.ev-chat-front i,.ev-dots i { width:3px; height:3px; border-radius:50%; background:#a8ebd6; animation:ev-dot 1.6s ease-in-out infinite; }
+.ev-chat-front i:nth-of-type(2),.ev-dots i:nth-child(2) { animation-delay:.2s; }
+.ev-chat-front i:nth-of-type(3),.ev-dots i:nth-child(3) { animation-delay:.4s; }
+.ev-laptop { width:57px; height:43px; border:2px solid #709c9b; border-radius:6px 6px 2px 2px; background:#122d38; display:grid; place-items:center; transform-origin:bottom; animation:ev-open .5s ease-out both; }
+.ev-laptop .ev-icon { width:21px; height:21px; }
+.ev-dots { display:flex; gap:5px; margin-bottom:4px; }
+.ev-laptop-base { width:67px; height:5px; background:#749a9b; position:absolute; top:59px; border-radius:2px 2px 7px 7px; }
+.ev-camera-frame { width:64px; height:51px; border:1px dashed #74ac9a; border-radius:10px; display:grid; place-items:center; }
+.ev-bank-card { width:49px; height:32px; position:relative; overflow:hidden; border-radius:5px; color:#c7f5d5; background:linear-gradient(140deg,#2d8547,#175b4c); transform:rotate(-9deg); animation:ev-turn 3.5s ease-in-out infinite; }
+.ev-bank-card .ev-icon { width:44px; height:31px; margin:auto; stroke-width:1.2; }
+.ev-bank-card i { position:absolute; inset:-10px; background:linear-gradient(110deg,transparent 40%,#dbffe355 50%,transparent 60%); animation:ev-shine 3.5s ease-in-out infinite; }
+.ev-gift { width:43px; height:34px; position:relative; margin-top:16px; background:#238755; border:1px solid #81dba7; border-radius:3px; animation:ev-bounce 3s ease-in-out infinite; }
+.ev-gift b { width:8px; height:100%; background:#ffc24b; position:absolute; left:17px; }
+.ev-gift-lid { width:49px; height:10px; border:1px solid #a3e6b6; background:#39a56b; left:-4px; top:-7px; position:absolute; z-index:1; border-radius:3px; animation:ev-lid 3s ease-in-out infinite; }
+.ev-bow { position:absolute; width:24px; height:12px; top:-18px; left:8px; border:3px solid #ffc24b; border-radius:50% 50% 10% 10%; animation:ev-lid 3s ease-in-out infinite; }
+.ev-spark { position:absolute; color:#ffc24b; top:3px; right:3px; animation:ev-dot 2s ease-in-out infinite; }
+.ev-wallet { position:absolute; width:31px; height:29px; display:grid; place-items:center; color:#b5f0ce; border:1px solid #6fb78e; background:#205644; border-radius:6px; font-size:17px; font-weight:700; }
+.ev-wallet.from { left:0; top:10px; }.ev-wallet.to { right:0; bottom:7px; }
+.ev-transfer { z-index:1; background:#143b42; border-radius:50%; padding:3px; animation:ev-transfer 2.5s ease-in-out infinite; }
+.ev-transfer .ev-icon { width:20px; height:20px; color:#ffc24b; }
+.ev-window { width:62px; height:49px; border:1px solid #81aea9; border-radius:6px; background:#193c46; padding-top:15px; display:flex; justify-content:center; position:relative; animation:ev-open .5s ease-out; }
+.ev-window>i { position:absolute; top:0; left:0; right:0; height:10px; border-bottom:1px solid #81aea960; background:radial-gradient(circle at 5px 5px,#7bd4ba 1px,transparent 2px),radial-gradient(circle at 11px 5px,#ffc24b 1px,transparent 2px); }
+.ev-window .ev-icon { animation:ev-dot 3s ease-in-out infinite; }
+.ev-notice { width:52px; height:52px; background:#184b44; border:1px solid #62b29a; border-radius:14px; display:grid; place-items:center; transform:rotate(-7deg); animation:ev-wiggle 3s ease-in-out infinite; }
+.ev-notice .ev-icon { width:29px; height:29px; }.ev-notice i { position:absolute; top:-3px; right:-3px; width:10px; height:10px; border:2px solid #173a3d; background:#ffc24b; border-radius:50%; }
+.ev-big-coin { width:46px; height:46px; color:#ffd477; display:grid; place-items:center; background:#98732b; border:2px solid #ffc24b; border-radius:50%; box-shadow:3px 0 #62491c; animation:ev-coin 2.5s ease-in-out infinite; }
+.ev-big-coin .ev-icon { width:39px; height:39px; }.ev-coin-shadow { position:absolute; width:34px; height:6px; bottom:4px; border-radius:50%; background:#020e1880; }
+@keyframes ev-arrive { from { opacity:0; transform:translateY(-12px) scale(.97); } to { opacity:1; transform:none; } }
+@keyframes ev-wiggle { 0%,12%,24%,100% { transform:rotate(-4deg); } 6%,18% { transform:rotate(6deg); } }
+@keyframes ev-ring { 0% { transform:scale(.8); opacity:.55; } 65%,100% { transform:scale(1.5); opacity:0; } }
+@keyframes ev-message { 0% { transform:translateY(9px); opacity:.3; } 16%,100% { transform:none; opacity:1; } }
+@keyframes ev-dot { 0%,70%,100% { opacity:.5; } 35% { opacity:1; } }
+@keyframes ev-open { from { transform:perspective(180px) rotateX(-60deg); opacity:.3; } to { transform:none; opacity:1; } }
+@keyframes ev-turn { 0%,100% { transform:rotate(-9deg); } 50% { transform:rotate(3deg); } }
+@keyframes ev-shine { 0%,25% { transform:translateX(-70px); } 65%,100% { transform:translateX(70px); } }
+@keyframes ev-bounce { 0%,50%,100% { transform:translateY(0); } 20% { transform:translateY(-4px); } }
+@keyframes ev-lid { 0%,55%,100% { transform:none; } 22% { transform:translateY(-6px) rotate(-8deg); } }
+@keyframes ev-transfer { 0%,100% { transform:translate(-3px,-3px); } 50% { transform:translate(3px,3px); } }
+@keyframes ev-coin { 0%,100% { transform:translateY(0) rotateY(0); } 50% { transform:translateY(-5px) rotateY(40deg); } }
+@media (max-width:360px) { .ev-scene { gap:8px; padding:11px 12px 11px 8px; }.ev-art { width:60px; }.ev-words { font-size:15px; } }
+@media (prefers-reduced-motion:reduce) { .event-stage * { animation:none !important; }.ev-ring,.ev-bank-card i { display:none; } }
+
+/* Белые карточки-наклейки, фиолетовые предметы; цвет не подсказывает правильный ответ. */
+.event-stage { color:var(--ink,#25204f); top:calc(env(safe-area-inset-top) + 65px); }
+.ev-shell { border:2px solid #fff; background:#fff; border-radius:22px; box-shadow:0 4px 0 #c3cdeb,0 9px 20px #2350a024; }
+.ev-art { color:var(--violet); }.ev-art:before { background:#f1edff; }
+.ev-eyebrow { color:var(--violet-2,#5937d2); }.ev-sender { color:var(--ink-2,#5b5782); }.ev-words { font-weight:850; }
+.ev-timing>div { background:#d5cafa; }.ev-timing span { background:var(--violet,#7350ff); }.ev-timing small { color:var(--ink,#25204f); text-shadow:none; font-weight:750; }
+.ev-result { background:#e3faeaf5; color:#187341; }.ev-miss .ev-result { background:#fff3ccf5; color:#755312; }
+.ev-phone { border-color:#a797e8; background:linear-gradient(#f7f4ff,#e3dcff); box-shadow:3px 4px #8b78cc; }.ev-speaker { background:#a293d3; }.ev-avatar { background:#d6cbff; }.ev-ring { border-color:#9d86fa; }
+.ev-chat-back { background:#e5e9ff; border-color:#a5a7dd; }.ev-chat-front { background:#dfd5ff; border-color:#a88cfa; }.ev-chat-front i,.ev-dots i { background:#957bd4; }
+.ev-laptop { background:#ece6ff; border-color:#b0a0df; }.ev-laptop-base { background:#a99bd3; }.ev-camera-frame { border-color:#b4a2e3; }
+.ev-bank-card { background:linear-gradient(140deg,#46c88b,#179b72); color:#fff; }.ev-gift { background:#977bff; border-color:#b6a2ff; }.ev-gift-lid { background:#b5a0ff; border-color:#ddcfff; }
+.ev-wallet { color:#6e4ec0; border-color:#c5a9ef; background:#eee4ff; }.ev-transfer { background:#fff8dc; }
+.ev-window { background:#ece7ff; border-color:#b7a6e6; }.ev-window>i { border-color:#cfc3ef; background:#dfd5ff; }
+.ev-notice { background:#e8e2ff; border-color:#bda6f4; }.ev-notice i { border-color:#fff; }.ev-big-coin { background:#ffd23f; color:#fff6bb; border-color:#f5b800; box-shadow:3px 0 #d99a00; }.ev-coin-shadow { background:#7760b733; }
+.ev-shopping-bag { position:absolute; width:39px; height:38px; left:9px; top:28px; border:2px solid #ae98e4; border-radius:5px 5px 9px 9px; background:#ede5ff; transform:rotate(-7deg); }
+.ev-shopping-bag i { position:absolute; width:17px; height:13px; left:9px; top:-11px; border:2px solid #ae98e4; border-bottom:0; border-radius:10px 10px 0 0; }
+.ev-price-tag { position:absolute; display:grid; place-items:center; width:42px; height:45px; right:1px; top:9px; color:#7350ff; background:#fff4c5; border:2px solid #ffd75f; border-radius:10px; transform:rotate(8deg); animation:ev-wiggle 3s ease-in-out infinite; }
+.ev-price-tag .ev-icon { width:28px; height:28px; }
+
+</style>
+  <style>
+/* Pastel chests, result wallet and locally drawn pets. */
+#screen-end { justify-content:flex-start; gap:14px; padding:28px 16px 24px; overflow-y:auto; touch-action:pan-y; overscroll-behavior:contain; }
+#screen-end>* { flex-shrink:0; }
+#screen-end .end-title { font-size:28px; margin:0; }
+#screen-end .end-stats { gap:8px; max-width:360px; margin:0; }
+#screen-end .stat { min-height:83px; padding:11px 5px; }
+#screen-end .stat-num { font-size:28px; }
+#screen-end .stat-lbl { min-height:24px; font-size:11px; }
+#screen-end .end-verdict { margin:0; min-height:0; font-size:14px; max-width:340px; }
+#screen-end #btn-again { width:100%; max-width:360px; margin:2px 0 0; padding:14px 20px; }
+.chest-shop { width:100%; max-width:410px; padding:13px 10px 10px; border-radius:24px; background:#ffffffdb; box-shadow:var(--card-sh); }
+.shop-heading { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:0 4px; }
+.shop-heading h3 { margin:0; font-size:18px; }
+.shop-wallet { display:flex; align-items:center; gap:5px; padding:5px 9px; border-radius:12px; background:#fff1b8; font-weight:900; font-size:16px; }
+.chest-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; margin:12px 0; }
+.chest-choice { min-width:0; padding:6px 2px 8px; border:2px solid #ddd5fa; border-radius:17px; background:#f8f5ff; color:var(--ink); display:flex; align-items:center; flex-direction:column; cursor:pointer; box-shadow:0 3px 0 #d7cef0; }
+.chest-choice:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #d7cef0; }
+.chest-choice:disabled { cursor:default; background:#f0f1f8; border-color:#e0e2ed; box-shadow:0 3px 0 #e0e2ed; }
+.chest-choice:disabled .chest-art { filter:saturate(.55); opacity:.7; }
+.chest-name { font-size:11px; font-weight:850; letter-spacing:-.2px; }
+.chest-price { margin-top:6px; display:flex; align-items:center; justify-content:center; gap:5px; min-width:58px; border-radius:10px; padding:4px 9px; background:#ffd954; box-shadow:0 2px 0 #dca626; font-size:17px; font-weight:900; }
+.chest-price .coin-dot { width:13px; height:13px; background:#ffed9c; border:1px solid #b7811f; }
+.chest-choice small { margin-top:6px; font-size:10px; font-weight:750; color:var(--ink-2); }
+.chest-art { --chest-light:#e7a66a; --chest-dark:#986040; --chest-trim:#ffe0a0; display:block; position:relative; width:88px; height:76px; flex:none; }
+.chest-art[data-chest=silver] { --chest-light:#d5e8ff; --chest-dark:#859fc2; --chest-trim:#f2fbff; }
+.chest-art[data-chest=gold] { --chest-light:#ffde67; --chest-dark:#d8972e; --chest-trim:#fff0ad; }
+.chest-base,.chest-lid { position:absolute; left:8px; width:72px; border:3px solid var(--chest-trim); background:linear-gradient(90deg,transparent 17%,#fff5 18%,#fff5 24%,transparent 25%,transparent 74%,#62434325 75%,#62434325 82%,transparent 83%),linear-gradient(var(--chest-light),var(--chest-dark)); box-shadow:0 2px 0 #51406a44; }
+.chest-base { top:41px; height:29px; border-radius:3px 3px 9px 9px; }
+.chest-lid { top:14px; height:30px; border-radius:19px 19px 4px 4px; transform-origin:5% 100%; }
+.chest-lock { position:absolute; top:36px; left:36px; width:16px; height:20px; border:2px solid var(--chest-dark); background:var(--chest-trim); border-radius:5px; }
+.chest-lock::after { content:""; position:absolute; width:4px; height:8px; left:4px; top:4px; border-radius:3px; background:var(--chest-dark); }
+.chest-glow { position:absolute; inset:0; border-radius:50%; background:radial-gradient(ellipse,#fff0bbaa,transparent 65%); }
+.run-collection { border-top:1px solid #e2def2; margin-top:10px; padding-top:9px; }
+.run-collection h4 { font-size:12px; margin:0 0 6px; text-align:left; }
+.run-pets { display:flex; gap:5px; overflow-x:auto; touch-action:pan-x; padding:0 0 4px; }
+.owned-pet { border:1px solid #e0d6f6; background:#f6f0ff; padding:2px; border-radius:12px; width:54px; min-width:54px; cursor:pointer; }
+.owned-pet svg { width:100%; display:block; }
+.modal-overlay { position:absolute; inset:0; z-index:30; display:flex; align-items:center; justify-content:center; padding:20px; background:#3d386259; -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); overflow-y:auto; touch-action:pan-y; }
+.pause-card,.reward-dialog { width:100%; max-width:360px; max-height:100%; overflow-y:auto; padding:24px 20px; border-radius:28px; background:#f8fbff; box-shadow:0 7px 0 #abafd9,0 16px 40px #28225035; color:var(--ink); text-align:center; }
+.pause-card { display:flex; flex-direction:column; gap:13px; }
+.pause-card h2 { margin:0; font-size:28px; }.pause-card p { margin:0 0 7px; font-size:15px; }
+.pause-mark { color:var(--violet); font-size:46px; font-weight:900; line-height:1; }
+.pause-card .btn-primary { padding:15px 20px; }.pause-card .btn-secondary { background:var(--violet-soft); }
+.pause-card .btn-text { padding:6px; font-size:14px; }.pause-card small { font-size:11px; color:var(--ink-2); }
+.reward-dialog { outline:none; }
+.reward-dialog h2 { margin:0 0 4px; font-size:27px; }
+.pet-art { width:165px; margin:0 auto; background:radial-gradient(ellipse,#e9dcff,transparent 70%); }
+.pet-art svg { width:100%; display:block; }
+.pet-rarity { display:inline-block; background:var(--pet-color); color:var(--ink); padding:4px 11px; border-radius:20px; font-size:12px; font-weight:850; }
+.pet-bio { font-size:13px; line-height:1.45; margin:12px 0; }
+.pet-lesson { padding:12px; border-radius:15px; background:#ece7ff; text-align:left; font-size:13px; line-height:1.5; }
+.pet-lesson strong { color:#5432c3; }.pet-lesson p { margin:5px 0 0; }
+#btn-reward-done { width:100%; margin-top:16px; padding:13px 16px; font-size:18px; }
+.reward-opening { display:flex; justify-content:center; align-items:center; height:240px; }
+.reward-opening .chest-art { transform:scale(2); }
+.reward-opening .chest-lid { animation:openLid .65s ease-in-out both; }
+.reward-opening .chest-lock { animation:unlockChest .65s ease-out both; }
+.reward-opening .chest-glow { animation:chestGlow .65s ease-out both; }
+@keyframes openLid { 0%,25% { transform:rotate(0); } 40% { transform:rotate(-10deg); } 100% { transform:translateY(-8px) rotate(-32deg); } }
+@keyframes unlockChest { 0%,25% { opacity:1; } 50%,100% { opacity:0; transform:translateY(8px); } }
+@keyframes chestGlow { from { opacity:0; transform:scale(.6); } to { opacity:1; transform:scale(2.3); } }
+
+@media(max-width:360px) { .chest-art { transform:scale(.88); margin:-4px -5px; }.chest-list { gap:5px; }.chest-name { font-size:10px; }.modal-overlay { padding:12px; }.reward-dialog { padding:18px 16px; }.pet-art { width:135px; } }
+@media(prefers-reduced-motion:reduce) { .chest-art * { animation:none!important; } }
+
+/* Лента зверушек из update/new_finish в светлой палитре локальной игры. */
+.reward-reel { position:relative; margin:24px -6px 16px; }
+.reel-window { position:relative; overflow:hidden; padding:14px 0; border:2px solid #ddd3fa; border-radius:20px; background:#ece7ff; }
+.reel-window::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#ece7ffdd,transparent 15%,transparent 85%,#ece7ffdd); }
+.reel-track { position:relative; left:50%; display:flex; gap:12px; width:max-content; }
+.spinning .reel-track { will-change:transform; }
+.reel-card { flex:0 0 104px; width:104px; padding:6px 4px 10px; border:2px solid var(--card-color); border-radius:16px; background:#ffffff; color:var(--ink); box-shadow:0 3px 0 #8270b518; }
+.reel-card svg { width:92px; height:88px; display:block; }
+.reel-name { display:block; font-size:12px; font-weight:850; }
+.reel-rarity { display:block; margin-top:5px; font-size:9px; font-weight:700; color:var(--ink-2); }
+.reel-pointer { position:absolute; z-index:2; top:-6px; left:50%; width:20px; height:20px; background:var(--sun); border:3px solid #fff; border-radius:5px; transform:translateX(-50%) rotate(45deg); box-shadow:2px 2px 0 #c79a39; }
+.reel-label { min-height:30px; margin:12px 0 0; font-size:13px; color:var(--ink-2); font-weight:750; }
+.reel-card.winner { border-color:var(--violet); background:#fff5cc; box-shadow:0 0 0 3px #bda8ff,0 4px 10px #7350ff33; }
+.pet-reveal { position:relative; isolation:isolate; margin:12px 0 0; }
+.pet-reveal .pet-art { position:relative; z-index:1; }
+.pet-aura { position:absolute; inset:8px 50%; width:180px; height:150px; margin-left:-90px; border-radius:50%; background:radial-gradient(ellipse,var(--pet-color),transparent 68%); opacity:0; animation:rewardHalo 1.4s ease-out both; pointer-events:none; }
+.reward-burst { position:absolute; z-index:2; left:50%; top:48%; pointer-events:none; }
+.reward-burst i { position:absolute; width:7px; height:11px; border-radius:2px; background:var(--confetti); color:var(--confetti); font-style:normal; animation:rewardConfetti 1.25s ease-out var(--delay) both; opacity:0; }
+.reward-burst i:nth-child(3n+1) { width:14px; height:14px; font-size:22px; line-height:14px; background:none; }
+.celebrating .pet-art { animation:rewardArrival .6s cubic-bezier(.2,.9,.3,1.3) both; }
+@keyframes rewardArrival { from { transform:translateY(20px) rotate(-12deg) scale(.55); opacity:0; } 65% { opacity:1; } to { transform:translateY(0) rotate(0) scale(1); opacity:1; } }
+@keyframes rewardHalo { 0% { opacity:0; transform:scale(.4); } 30% { opacity:.8; } 100% { opacity:0; transform:scale(1.5); } }
+@keyframes rewardConfetti { 0% { opacity:0; transform:translate(0,0) scale(.3); } 12% { opacity:1; } 70% { opacity:1; } 100% { opacity:0; transform:translate(var(--dx),var(--dy)) rotate(var(--turn)) scale(.7); } }
+@media(prefers-reduced-motion:reduce) { .pet-aura,.reward-burst { display:none; }.celebrating .pet-art { animation:none; } }
+
+/* Плашка успешного финиша четырёхминутного забега. */
+.run-complete { position:relative; width:100%; max-width:360px; padding:14px 12px 20px; border:3px solid #fff; border-radius:28px; background:linear-gradient(145deg,#fff7d5,#fffdf5 55%,#eee9ff); box-shadow:0 5px 0 #d9cff2,0 10px 24px #7350ff17; text-align:center; color:var(--ink); animation:riseIn .45s ease-out both; }
+.complete-art { display:block; width:218px; max-width:100%; height:102px; margin:0 auto 5px; }
+.run-complete h2 { margin:0 0 6px; font-size:28px; line-height:1.15; font-weight:900; letter-spacing:-.5px; }
+.run-complete p { margin:0; font-size:16px; line-height:1.35; font-weight:800; color:#61539a; }
+#screen-end .run-complete+.end-title.hidden { display:none; }
+@media(max-width:360px) { .run-complete { padding:12px 10px 17px; }.run-complete h2 { font-size:25px; }.run-complete p { font-size:14px; }.complete-art { height:90px; } }
+
+/* ---------- Витрина выбора персонажа (детерминированная покупка, без азарта) ---------- */
+.chest-list { max-height:44vh; overflow-y:auto; padding:2px; -webkit-overflow-scrolling:touch; }
+.pet-buy { min-width:0; padding:6px 3px 7px; border:2px solid #ddd5fa; border-top:4px solid var(--pet-color,#ddd5fa); border-radius:16px; background:#f8f5ff; color:var(--ink); display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; box-shadow:0 3px 0 #d7cef0; }
+.pet-buy:active:not(:disabled) { transform:translateY(2px); box-shadow:0 1px 0 #d7cef0; }
+.pet-buy:disabled { cursor:default; }
+.pet-buy:disabled:not(.owned) { background:#f0f1f8; border-color:#e0e2ed; border-top-color:#e0e2ed; box-shadow:0 3px 0 #e0e2ed; }
+.pet-buy:disabled:not(.owned) .pet-thumb { filter:saturate(.5); opacity:.6; }
+.pet-buy.owned { background:#eafff1; border-color:#b6f0d2; border-top-color:#2fd06e; box-shadow:0 3px 0 #bfeccd; cursor:default; }
+.pet-thumb { width:64px; height:60px; }
+.pet-thumb svg { width:100%; height:100%; display:block; }
+.pet-buy-name { font-size:10.5px; font-weight:850; letter-spacing:-.2px; line-height:1.05; text-align:center; }
+.pet-buy-price { display:flex; align-items:center; justify-content:center; gap:4px; border-radius:9px; padding:2px 7px; background:#ffd954; box-shadow:0 2px 0 #dca626; font-size:14px; font-weight:900; }
+.pet-buy-price .coin-dot { width:11px; height:11px; background:#ffed9c; border:1px solid #b7811f; }
+.pet-buy.owned .pet-buy-price { background:#c8f6d8; box-shadow:0 2px 0 #92d6a8; }
+.pet-buy small { font-size:9.5px; font-weight:750; color:var(--ink-2); }
+.pet-buy.owned small { color:#12965a; }
+
+</style>
+</head>
+<body>
+  <div id="app">
+    <!-- Игровое поле -->
+    <canvas id="game" tabindex="-1" aria-label="Бег по трём дорожкам. Стрелки влево и вправо — манёвр, вверх или пробел — прыжок."></canvas>
+    <section id="event-stage" class="event-stage hidden" role="status" aria-live="polite" aria-atomic="true"></section>
+
+    <!-- HUD во время забега -->
+    <div id="hud" class="hud hidden">
+      <div class="hud-left">
+        <div class="hud-chip" id="distance">0 м</div>
+        <div class="hud-chip coins" id="coins"><span class="coin-dot" id="coin-target" aria-hidden="true"></span><span id="coins-n">0</span></div>
+      </div>
+      <div class="hud-right">
+        <button class="icon-btn" id="sound-run" aria-label="Включить звук"></button>
+        <button class="icon-btn" id="btn-pause" aria-label="Пауза и выход"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="5" height="18" rx="2"/><rect x="14" y="3" width="5" height="18" rx="2"/></svg></button>
+      </div>
+      <div class="hud-health"><div class="lives" id="lives" role="status" aria-live="polite" aria-atomic="true"></div><div class="hud-chip combo hidden" id="combo">x2</div></div>
+    </div>
+
+    <!-- Подсказка действий (нижние дорожки) -->
+    <div id="lane-legend" class="lane-legend hidden">
+      <button class="legend-item lane-btn" data-lane="0" aria-label="Отказать"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></span><span class="lb-label">Отказать</span></button>
+      <button class="legend-item lane-btn" data-lane="1" aria-label="Проверить"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15.2 15.2l4.8 4.8"/></svg></span><span class="lb-label">Проверить</span></button>
+      <button class="legend-item lane-btn" data-lane="2" aria-label="Можно"><span class="lb-circle"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="lb-label">Можно</span></button>
+    </div>
+
+    <!-- Всплывающее «почему» при ошибке -->
+    <div id="flash" class="flash hidden"></div>
+
+    <!-- Стартовый экран -->
+    <section id="screen-start" class="screen">
+      <div class="brand">
+        <h1 class="game-title">Не <span class="accent">попадись!</span></h1>
+        <p class="subtitle">Распознай ловушку на бегу</p>
+      </div>
+      <div class="start-stage" aria-hidden="true"></div>
+      <div class="start-bottom">
+        <button class="btn-primary" id="btn-play">Играть</button>
+        <label class="sound-toggle">
+          <input type="checkbox" id="sound-toggle" />
+          <span class="pill" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="8" width="4" height="8" rx="1.5"/><path d="M8 8l7-5v18l-7-5z"/><path d="M18 8q4 4 0 8M21 5q6 7 0 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+          <span class="sound-lbl">Звуки игры</span>
+        </label>
+      </div>
+    </section>
+
+    <section id="tutorial-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" aria-describedby="tutorial-subtitle">
+      <div class="tutorial-card">
+        <button id="btn-tutorial-close" class="tutorial-close" aria-label="Пропустить обучение и начать игру"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+        <h2 id="tutorial-title">Как играть</h2>
+        <p id="tutorial-subtitle">Герой бежит сам</p>
+        <div class="tutorial-moves">
+          <div class="tutorial-step">
+            <svg class="tutorial-art" viewBox="0 0 140 116" aria-hidden="true">
+              <defs><g id="tutorial-hero"><ellipse cy="24" rx="18" ry="5" fill="#c2b7eb"/><path d="M0-24L19-17V1Q18 17 0 24Q-18 17-19 1V-17Z" fill="#22c37a" stroke="#fff" stroke-width="3"/><ellipse cx="-7" cy="-6" rx="4" ry="6" fill="#fff"/><ellipse cx="7" cy="-6" rx="4" ry="6" fill="#fff"/><circle cx="-6" cy="-5" r="2" fill="#23246a"/><circle cx="8" cy="-5" r="2" fill="#23246a"/><path d="M-5 6q5 6 10 0" fill="none" stroke="#23246a" stroke-width="2.5" stroke-linecap="round"/></g></defs>
+              <path d="M17 108L36 10H104L123 108" fill="#e2daf7"/><path d="M51 12L44 108M89 12L96 108" stroke="#fff" stroke-width="2" stroke-dasharray="6 6"/>
+              <g fill="#a28bd4" stroke="#fff" stroke-width="2"><rect x="53" y="18" width="34" height="38" rx="4"/><path d="M58 23l24 28m0-28L58 51"/></g>
+              <g class="tutorial-dodge"><use href="#tutorial-hero" x="70" y="75"/></g>
+              <path d="M33 105H107m-68-6l-6 6 6 6m62-12l6 6-6 6" fill="none" stroke="#7350ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <strong>Обходи ящики</strong><span>Свайп ← →</span>
+          </div>
+          <div class="tutorial-step">
+            <svg class="tutorial-art" viewBox="0 0 140 116" aria-hidden="true">
+              <path d="M17 108L36 10H104L123 108" fill="#fff0bf"/><path d="M51 12L44 108M89 12L96 108" stroke="#fff" stroke-width="2" stroke-dasharray="6 6"/>
+              <ellipse cx="70" cy="23" rx="14" ry="17" fill="#ffd23f" stroke="#fff5be" stroke-width="3"/><text x="70" y="28" text-anchor="middle" fill="#855015" font-size="13" font-weight="900">X5</text>
+              <path d="M47 83v23m46-23v23" stroke="#9987bc" stroke-width="7"/><rect x="41" y="73" width="58" height="17" rx="4" fill="#ffd23f"/><path d="M48 88l10-13m8 13l10-13m8 13l10-13" stroke="#c28b31" stroke-width="4"/>
+              <g class="tutorial-jump"><use href="#tutorial-hero" x="70" y="62"/></g>
+              <path d="M118 84V53m-6 6l6-6 6 6" fill="none" stroke="#7350ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <strong>Прыгай за монетами</strong><span>Свайп ↑</span>
+          </div>
+        </div>
+        <div class="tutorial-answer">
+          <strong>Выбирай безопасный ответ</strong>
+          <div class="tutorial-choices" aria-hidden="true">
+            <span><i class="tutorial-no">×</i>Отказать</span><span><i class="tutorial-check"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/></svg></i>Проверить</span><span><i class="tutorial-yes">✓</i>Можно</span>
+          </div>
+        </div>
+        <button id="btn-tutorial-start" class="btn-primary">Поехали!</button>
+        <p class="tutorial-keyboard">На компьютере: ← → и пробел</p>
+      </div>
+    </section>
+
+    <!-- Экран итога -->
+    <section id="screen-end" class="screen hidden" aria-labelledby="end-title">
+      <div id="run-complete" class="run-complete hidden" role="status" aria-live="polite">
+        <svg class="complete-art" viewBox="0 0 240 112" aria-hidden="true">
+          <ellipse cx="120" cy="55" rx="64" ry="48" fill="#ffedab"/>
+          <g fill="none" stroke-width="5" stroke-linecap="round"><path d="M43 29l-7-6m4 61l-9 4m166-60l8-5m-9 58l9 4" stroke="#a493ed"/><path d="M65 14l-2-8m112 8l3-8m-8 89l4 7m-100-7l-3 7" stroke="#efb738"/></g>
+          <g fill="#70d7aa"><circle cx="29" cy="54" r="4"/><circle cx="212" cy="52" r="4"/></g>
+          <path d="M98 70l-8 36 18-7 10 11 7-34M141 70l9 36-18-7-10 11-7-34" fill="#9980ee"/>
+          <circle cx="120" cy="51" r="42" fill="#e7ae32"/><circle cx="120" cy="48" r="41" fill="#ffd45b" stroke="#fff3c8" stroke-width="4"/>
+          <path d="M120 18l24 9v22q-1 20-24 31-23-11-24-31V27Z" fill="#22bc7b" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M108 48l9 9 17-20" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h2 id="complete-title">Поздравляем!</h2>
+        <p>Ты добежал до конца и ни разу не попался на ловушку!</p>
+      </div>
+      <h2 class="end-title" id="end-title">Забег окончен!</h2>
+      <div class="end-stats">
+        <div class="stat"><div class="stat-num" id="end-distance">0</div><div class="stat-lbl">метров</div></div>
+        <div class="stat"><div class="stat-num" id="end-coins">0</div><div class="stat-lbl">монет</div></div>
+        <div class="stat"><div class="stat-num" id="end-recognized">0</div><div class="stat-lbl">ловушек<br>распознано</div></div>
+      </div>
+      <p class="end-verdict" id="end-verdict"></p>
+      <div class="end-review" id="end-review"></div>
+      <section class="chest-shop" aria-labelledby="shop-title">
+        <div class="shop-heading"><h3 id="shop-title">Выбери друга за монеты</h3><span class="shop-wallet"><i class="coin-dot" aria-hidden="true"></i><span id="shop-balance" aria-live="polite">0</span><span class="sr-only">монет осталось</span></span></div>
+        <div class="chest-list" id="chest-list"></div>
+        <div id="run-collection" class="run-collection hidden"><h4 id="collection-heading">Зверушки забега</h4><div id="run-pets" class="run-pets"></div></div>
+      </section>
+      <button class="btn-primary" id="btn-again">Начать заново</button>
+    </section>
+
+    <section id="pause-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="pause-card"><span class="pause-mark" aria-hidden="true">Ⅱ</span><h2 id="pause-title">Передохнём?</h2><p>Забег подождёт тебя.</p>
+        <button class="btn-primary" id="btn-resume">Продолжить</button>
+        <button class="btn-secondary" id="btn-finish-run">Завершить забег</button>
+        <button class="btn-text" id="btn-exit">Выйти из игры</button>
+        <small>При выходе забег и монеты сбросятся.</small>
+      </div>
+    </section>
+    <section id="reward-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="reward-title">
+      <div class="reward-dialog" id="reward-dialog" tabindex="-1"><h2 id="reward-title">Кто внутри?</h2><div id="reward-opening" class="reward-opening"></div><div id="reward-reel" class="reward-reel hidden"><span class="reel-pointer" aria-hidden="true"></span><div class="reel-window" aria-hidden="true"><div id="reel-track" class="reel-track"></div></div><p id="reel-label" class="reel-label" role="status">Кто станет твоим другом?</p></div><div id="reward-pet" class="hidden" role="status" aria-live="polite"></div><button class="btn-primary hidden" id="btn-reward-done">К сундукам</button></div>
+    </section>
+
+    <!-- Загрузка -->
+    <section id="screen-loading" class="screen">
+      <div class="loader"></div>
+      <p>Загрузка…</p>
+    </section>
+  </div>
+
+  <script>
+/* Generated from content.json by scripts/build.py. No network required. */
+window.GAME_CONTENT = {
+  "meta": {
+    "title": "Не попадись!",
+    "learningGoal": "Ребёнок на лету распознаёт приёмы обмана (давление, выманивание кода/пароля, слишком хороший приз, поддельные ссылки) и выбирает безопасное действие.",
+    "ageRating": "6+"
+  },
+  "actions": [
+    {
+      "id": "refuse",
+      "label": "Отказать",
+      "emoji": "🛑",
+      "lane": 0
+    },
+    {
+      "id": "check",
+      "label": "Проверить",
+      "emoji": "🔎",
+      "lane": 1
+    },
+    {
+      "id": "ok",
+      "label": "Можно",
+      "emoji": "✅",
+      "lane": 2
+    }
+  ],
+  "difficulty": {
+    "startSpeed": 105,
+    "maxSpeed": 260,
+    "speedRampPerSec": 1.2,
+    "spawnGapStart": 2.4,
+    "spawnGapMin": 1.5,
+    "spawnGapRampPerSec": 0.008,
+    "lives": 3,
+    "eventReadSeconds": 6,
+    "runSeconds": 10,
+    "runSpeedMultiplier": 1.5
+  },
+  "situations": [
+    {
+      "icon": "🔢",
+      "text": "Назови код из СМС",
+      "answer": "refuse",
+      "why": "Код из СМС — секрет. Его нельзя сообщать никому, даже «банку» или «другу».",
+      "id": "sms-code",
+      "visual": {
+        "type": "call",
+        "sender": "Номер не сохранён"
+      }
+    },
+    {
+      "icon": "🔑",
+      "text": "Скажи свой пароль",
+      "answer": "refuse",
+      "why": "Пароль не говорят никому. Настоящий банк пароль не спрашивает.",
+      "id": "password",
+      "visual": {
+        "type": "account",
+        "sender": "Запрос доступа",
+        "field": "Пароль"
+      }
+    },
+    {
+      "icon": "💳",
+      "text": "Пришли фото карты с двух сторон",
+      "answer": "refuse",
+      "why": "Данные карты нельзя пересылать. По ним могут украсть деньги.",
+      "id": "card-photo",
+      "visual": {
+        "type": "card"
+      }
+    },
+    {
+      "icon": "⏰",
+      "text": "СРОЧНО переведи, а то заблокируют!",
+      "answer": "refuse",
+      "why": "Срочность и угрозы — приём обмана. Настоящий банк не торопит и не пугает.",
+      "id": "urgent-transfer",
+      "visual": {
+        "type": "call",
+        "sender": "Номер не сохранён"
+      }
+    },
+    {
+      "icon": "🎁",
+      "text": "Ты выиграл 10 000 ₽! Забери сейчас",
+      "answer": "refuse",
+      "why": "«Бесплатный приз», который ты не выигрывал, — это ловушка.",
+      "id": "prize",
+      "visual": {
+        "type": "gift"
+      }
+    },
+    {
+      "icon": "🤫",
+      "text": "Никому не говори про это",
+      "answer": "refuse",
+      "why": "Если просят держать в секрете от родителей — это тревожный знак. Расскажи взрослому.",
+      "id": "secret",
+      "visual": {
+        "type": "chat",
+        "sender": "Собеседник"
+      }
+    },
+    {
+      "icon": "👤",
+      "text": "Давай встретимся, никому не говори",
+      "answer": "refuse",
+      "why": "Незнакомцам из сети нельзя доверять и встречаться с ними. Скажи взрослому.",
+      "id": "meetup",
+      "visual": {
+        "type": "chat",
+        "sender": "Новый контакт"
+      }
+    },
+    {
+      "icon": "💸",
+      "text": "Переведи деньги — и получишь в 2 раза больше",
+      "answer": "refuse",
+      "why": "Деньги не удваиваются сами. Это обман, чтобы ты отдал свои.",
+      "id": "double-money",
+      "visual": {
+        "type": "transfer"
+      }
+    },
+    {
+      "icon": "📞",
+      "text": "Это служба безопасности банка, срочно!",
+      "answer": "refuse",
+      "why": "Так представляются мошенники. Положи трубку и проверь сам.",
+      "id": "bank-call",
+      "visual": {
+        "type": "call",
+        "sender": "Номер не сохранён"
+      }
+    },
+    {
+      "icon": "🔗",
+      "text": "Перейди: sber-priz.xyz",
+      "answer": "check",
+      "why": "Странный адрес — повод проверить. Открывай только настоящее приложение.",
+      "id": "prize-link",
+      "visual": {
+        "type": "browser",
+        "address": "sber-priz.xyz"
+      }
+    },
+    {
+      "icon": "📩",
+      "text": "«Банк» написал в мессенджере",
+      "answer": "check",
+      "why": "Банк пишет в своём приложении, а не в чатах. Лучше проверить.",
+      "id": "bank-chat",
+      "visual": {
+        "type": "chat",
+        "sender": "«Банк»"
+      }
+    },
+    {
+      "icon": "🧑‍🤝‍🧑",
+      "text": "Друг просит денег с чужого аккаунта",
+      "answer": "check",
+      "why": "Аккаунт могли взломать. Позвони другу и проверь, он ли это.",
+      "id": "friend-money",
+      "visual": {
+        "type": "chat",
+        "sender": "Сообщение от друга"
+      }
+    },
+    {
+      "icon": "📧",
+      "text": "Письмо: «подтвердите данные по ссылке»",
+      "answer": "check",
+      "why": "По ссылкам из писем не переходят. Проверь в приложении.",
+      "id": "email-link",
+      "visual": {
+        "type": "browser",
+        "variant": "email",
+        "address": "Ссылка в письме"
+      }
+    },
+    {
+      "icon": "🎮",
+      "text": "Бесплатные монеты в игре — введи логин",
+      "answer": "check",
+      "why": "Чужие сайты за «подарки» воруют аккаунты. Сначала спроси взрослого.",
+      "id": "game-currency",
+      "visual": {
+        "type": "account",
+        "sender": "Игровые монеты",
+        "field": "Логин"
+      }
+    },
+    {
+      "icon": "🍽️",
+      "text": "Мама зовёт ужинать",
+      "answer": "ok",
+      "why": "Это обычная просьба близкого человека — всё в порядке.",
+      "id": "dinner",
+      "visual": {
+        "type": "call",
+        "sender": "Мама"
+      }
+    },
+    {
+      "icon": "🏫",
+      "text": "Учитель напомнил про домашку",
+      "answer": "ok",
+      "why": "Обычное сообщение от знакомого взрослого.",
+      "id": "homework",
+      "visual": {
+        "type": "chat",
+        "sender": "Учитель"
+      }
+    },
+    {
+      "icon": "🔔",
+      "text": "Уведомление в приложении Сбербанк",
+      "answer": "ok",
+      "why": "Настоящие уведомления приходят внутри приложения — им можно доверять.",
+      "id": "bank-notification",
+      "visual": {
+        "type": "notification",
+        "sender": "Сбербанк"
+      }
+    },
+    {
+      "icon": "🪙",
+      "text": "Монетка на дороге",
+      "answer": "ok",
+      "why": "Можно собрать — это очки, а не ловушка.",
+      "id": "coin",
+      "visual": {
+        "type": "coin"
+      },
+      "delivery": "pickup"
+    },
+    {
+      "icon": "👋",
+      "text": "Друг зовёт гулять во двор",
+      "answer": "ok",
+      "why": "Знакомый друг и обычное приглашение — всё хорошо.",
+      "id": "walk",
+      "visual": {
+        "type": "chat",
+        "sender": "Друг"
+      }
+    },
+    {
+      "icon": "📅",
+      "text": "Напоминание: завтра тренировка",
+      "answer": "ok",
+      "why": "Обычное напоминание, ничего опасного.",
+      "id": "training",
+      "visual": {
+        "type": "notification",
+        "sender": "Напоминание",
+        "variant": "calendar"
+      }
+    },
+    {
+      "id": "mom-card-number",
+      "text": "Незнакомец предлагает 1000 рублей, если ты скажешь номер банковской карты мамы.",
+      "why": "Нельзя передавать чужие банковские данные.",
+      "answer": "refuse",
+      "icon": "💳",
+      "visual": {
+        "type": "chat",
+        "sender": "Незнакомец"
+      }
+    },
+    {
+      "id": "password-for-coins",
+      "text": "В игре предлагают бесплатные монеты за пароль от аккаунта.",
+      "why": "Пароли нельзя никому сообщать.",
+      "answer": "refuse",
+      "icon": "🎮",
+      "visual": {
+        "type": "account",
+        "sender": "Игровые монеты",
+        "field": "Пароль"
+      }
+    },
+    {
+      "id": "double-500",
+      "text": "Незнакомец обещает удвоить твои 500 рублей за один день.",
+      "why": "Это похоже на обман.",
+      "answer": "refuse",
+      "icon": "💸",
+      "visual": {
+        "type": "transfer",
+        "sender": "Незнакомец"
+      }
+    },
+    {
+      "id": "sale-80",
+      "text": "Ты видишь рекламу: «Скидка 80% только сегодня!»",
+      "why": "Проверить первоначальную цену и необходимость покупки.",
+      "answer": "check",
+      "icon": "🏷️",
+      "visual": {
+        "type": "purchase",
+        "sender": "Реклама скидки"
+      }
+    },
+    {
+      "id": "vending-price",
+      "text": "В автомате продают напиток, но цена не указана.",
+      "why": "Узнать стоимость до оплаты.",
+      "answer": "check",
+      "icon": "🥤",
+      "visual": {
+        "type": "purchase",
+        "sender": "Автомат с напитками"
+      }
+    },
+    {
+      "id": "free-trial",
+      "text": "Тебе предлагают бесплатный пробный период приложения.",
+      "why": "Проверить, не начнутся ли платные списания.",
+      "answer": "check",
+      "icon": "📱",
+      "visual": {
+        "type": "purchase",
+        "sender": "Пробный период"
+      }
+    },
+    {
+      "id": "three-for-two",
+      "text": "В магазине акция: «Купи два товара, получи третий бесплатно».",
+      "why": "Посчитать, выгодна ли покупка трёх товаров.",
+      "answer": "check",
+      "icon": "🛍️",
+      "visual": {
+        "type": "purchase",
+        "sender": "Акция в магазине"
+      }
+    },
+    {
+      "id": "neighbor-job",
+      "text": "Тебе предлагают заработать деньги за помощь соседу с уборкой двора.",
+      "why": "Уточнить работу, оплату и безопасность с родителями.",
+      "answer": "check",
+      "icon": "🧹",
+      "visual": {
+        "type": "chat",
+        "sender": "Помощь соседу"
+      }
+    },
+    {
+      "id": "phone-prize-delivery",
+      "text": "Тебе пришло сообщение: «Ты выиграл телефон! Заплати 300 рублей за доставку».",
+      "why": "За выдуманный приз могут выманивать деньги.",
+      "answer": "refuse",
+      "icon": "🎁",
+      "visual": {
+        "type": "gift",
+        "sender": "Сообщение о призе"
+      }
+    },
+    {
+      "id": "card-photo-gift",
+      "text": "В интернете просят фотографию банковской карты родителей для получения подарка.",
+      "why": "Данные карты могут украсть.",
+      "answer": "refuse",
+      "icon": "💳",
+      "visual": {
+        "type": "card",
+        "sender": "Подарок за фото"
+      }
+    },
+    {
+      "id": "sms-for-transfer",
+      "text": "Незнакомец просит назвать код из СМС, обещая перевести деньги.",
+      "why": "Коды подтверждения нельзя сообщать.",
+      "answer": "refuse",
+      "icon": "🔢",
+      "visual": {
+        "type": "call",
+        "sender": "Незнакомец"
+      }
+    },
+    {
+      "id": "classmate-bet",
+      "text": "Одноклассник предлагает сыграть в игру на деньги, где проигравший отдаёт 200 рублей.",
+      "why": "Не стоит участвовать в денежных азартных играх.",
+      "answer": "refuse",
+      "icon": "🎲",
+      "visual": {
+        "type": "chat",
+        "sender": "Одноклассник"
+      }
+    },
+    {
+      "id": "expired-juice",
+      "text": "Продавец предлагает купить просроченный сок со скидкой 90%.",
+      "why": "Просроченные продукты могут быть опасны.",
+      "answer": "refuse",
+      "icon": "🧃",
+      "visual": {
+        "type": "purchase",
+        "sender": "Предложение продавца"
+      }
+    },
+    {
+      "id": "unknown-download",
+      "text": "В интернете предлагают скачать неизвестную программу для бесплатных игровых денег.",
+      "why": "Программа может оказаться вредоносной.",
+      "answer": "refuse",
+      "icon": "💻",
+      "visual": {
+        "type": "browser",
+        "sender": "Неизвестная программа",
+        "label": "Предложение на сайте"
+      }
+    },
+    {
+      "id": "hundred-for-thousand",
+      "text": "Незнакомец просит перевести ему 100 рублей, обещая вернуть 1000.",
+      "why": "Обещание лёгких денег — признак мошенничества.",
+      "answer": "refuse",
+      "icon": "💸",
+      "visual": {
+        "type": "transfer",
+        "sender": "Незнакомец"
+      }
+    },
+    {
+      "id": "buy-account-password",
+      "text": "В чате предлагают купить пароль от чужого игрового аккаунта.",
+      "why": "Чужие аккаунты покупать нельзя.",
+      "answer": "refuse",
+      "icon": "🔑",
+      "visual": {
+        "type": "account",
+        "sender": "Пароль от чужого аккаунта",
+        "field": "Пароль"
+      }
+    },
+    {
+      "id": "friend-pin",
+      "text": "Друг просит сообщить PIN-код родительской карты, чтобы снять немного денег.",
+      "why": "PIN-код должен оставаться секретным.",
+      "answer": "refuse",
+      "icon": "🔐",
+      "visual": {
+        "type": "chat",
+        "sender": "Сообщение от друга"
+      }
+    },
+    {
+      "id": "documents-for-money",
+      "text": "Незнакомец предлагает деньги за фотографию твоего паспорта или документов родителей.",
+      "why": "Личные документы нельзя передавать посторонним.",
+      "answer": "refuse",
+      "icon": "🪪",
+      "visual": {
+        "type": "chat",
+        "sender": "Личные документы"
+      }
+    },
+    {
+      "id": "tablet-card-data",
+      "text": "Сайт обещает бесплатный планшет, если ввести данные банковской карты.",
+      "why": "Это может быть мошеннический сайт.",
+      "answer": "refuse",
+      "icon": "🎁",
+      "visual": {
+        "type": "browser",
+        "sender": "Планшет в подарок",
+        "label": "Предложение на сайте"
+      }
+    },
+    {
+      "id": "fake-cash",
+      "text": "Кто-то предлагает купить поддельные купюры и расплачиваться ими.",
+      "why": "Поддельные деньги использовать незаконно.",
+      "answer": "refuse",
+      "icon": "💵",
+      "visual": {
+        "type": "chat",
+        "sender": "Сомнительное предложение"
+      }
+    },
+    {
+      "id": "parents-card-secret",
+      "text": "В игре предлагают редкий предмет, если ты оплатишь покупку картой родителей без спроса.",
+      "why": "Нельзя тратить чужие деньги без разрешения.",
+      "answer": "refuse",
+      "icon": "🎮",
+      "visual": {
+        "type": "account",
+        "sender": "Редкий игровой предмет"
+      }
+    },
+    {
+      "id": "address-for-money",
+      "text": "Незнакомец в интернете просит твой домашний адрес и обещает прислать деньги.",
+      "why": "Личные данные незнакомцам сообщать опасно.",
+      "answer": "refuse",
+      "icon": "🏠",
+      "visual": {
+        "type": "chat",
+        "sender": "Незнакомец в интернете"
+      }
+    }
+  ]
+};
+
+</script>
+  <script>
+/* Small compatibility helpers; no browser extensions or native APIs required. */
+(function () {
+  "use strict";
+  window.GamePlatform = {
+    block: function (surface, blocked) {
+      // inert arrived after iOS 15.0. CSS, ARIA and the modal focus trap also work without it.
+      surface.inert = blocked;
+      surface.classList.toggle("input-blocked", blocked);
+      if (blocked) surface.setAttribute("aria-hidden", "true");
+      else surface.removeAttribute("aria-hidden");
+    }
+  };
+})();
+
+</script>
+  <script>
+/* Предметные события. Локальные SVG и CSS-анимации; без зависимостей. */
+(function () {
+  "use strict";
+  var icons = {
+    person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
+    price: '<path d="M3 3h8l10 10-8 8L3 11z"/><circle cx="7.5" cy="7.5" r="1.5"/><path d="m11 11 5 5M14 10l3 3"/>',
+    phone: '<path d="M5 3l4 4-2 3a16 16 0 0 0 7 7l3-2 4 4-2 3C10 22 2 14 2 5z"/>',
+    message: '<path d="M21 11a9 9 0 0 1-9 9H3l2-5a9 9 0 1 1 16-4z"/><path d="M8 9h8M8 13h5"/>',
+    lock: '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/>',
+    card: '<rect x="2" y="4" width="20" height="16" rx="3"/><path d="M2 9h20M6 15h4"/>',
+    gift: '<rect x="3" y="9" width="18" height="4" rx="1"/><path d="M5 13v8h14v-8M12 9v12M12 9C4 9 5 2 8 3c3 0 4 6 4 6zm0 0s1-6 4-6c4-1 4 6-4 6z"/>',
+    transfer: '<path d="M3 7h17m-5-5 5 5-5 5M21 17H4m5-5-5 5 5 5"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><ellipse cx="12" cy="12" rx="4" ry="10"/><path d="M2 12h20"/>',
+    bell: '<path d="M5 9a7 7 0 0 1 14 0c0 6 2 6 2 8H3c0-2 2-2 2-8M9 21h6"/>',
+    calendar: '<rect x="3" y="5" width="18" height="17" rx="3"/><path d="M7 2v6M17 2v6M3 11h18M8 16h2M14 16h2"/>',
+    mail: '<rect x="2" y="4" width="20" height="16" rx="3"/><path d="m3 6 9 7 9-7"/>',
+    coin: '<circle cx="12" cy="12" r="10"/><path d="m12 5 2 4 4 1-3 3 1 5-4-2-4 2 1-5-3-3 4-1z"/>',
+    camera: '<path d="M8 5l2-3h4l2 3h5v15H3V5z"/><circle cx="12" cy="12" r="4"/>',
+    check: '<path d="m5 12 4 4L20 5"/>',
+    sound: '<path d="M3 9h4l5-4v14l-5-4H3zM16 8a6 6 0 0 1 0 8M19 5a10 10 0 0 1 0 14"/>'
+  };
+  var types = {
+    call: { label: "Звонок", icon: "phone", motion: "Телефон покачивается, вокруг собеседника расходятся кольца." },
+    purchase: { label: "Покупка", icon: "price", motion: "Ценник мягко покачивается над пакетиком покупки." },
+    chat: { label: "Переписка", icon: "message", motion: "Появляется индикатор набора, затем выдвигается сообщение." },
+    account: { label: "Аккаунт", icon: "lock", motion: "Открывается маленький ноутбук, последовательно появляются точки пароля." },
+    card: { label: "Фото карты", icon: "card", motion: "Карта разворачивается в рамке камеры, по ней проходит свет." },
+    gift: { label: "Подарок", icon: "gift", motion: "Коробка подпрыгивает и приоткрывает крышку." },
+    transfer: { label: "Перевод", icon: "transfer", motion: "Между двумя кошельками появляется стрелка предложения." },
+    browser: { label: "Ссылка или письмо", icon: "globe", motion: "Разворачивается маленькое окно браузера или письма; адрес виден рядом." },
+    notification: { label: "Уведомление", icon: "bell", motion: "Покачивается значок колокольчика или календаря с точкой нового уведомления." },
+    coin: { label: "Монетка", icon: "coin", motion: "Монетка поворачивается и ловит блик." }
+  };
+
+  function icon(name, cls) {
+    return '<svg class="ev-icon ' + (cls || "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (icons[name] || icons.message) + '</svg>';
+  }
+  function escape(s) { return String(s || "").replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function scene(s, type) {
+    var v = s.visual || {}, art = "", label = types[type].label;
+    if (type === "purchase") {
+      art = '<span class="ev-shopping-bag"><i></i></span><span class="ev-price-tag">' + icon("price") + '</span>';
+    } else if (type === "call") {
+      label = "Входящий звонок";
+      art = '<div class="ev-phone"><i class="ev-speaker"></i><span class="ev-avatar">' + icon("person") + '</span><span class="ev-receiver">' + icon("phone") + '</span></div><i class="ev-ring r1"></i><i class="ev-ring r2"></i>';
+    } else if (type === "chat") {
+      art = '<span class="ev-chat-back"></span><span class="ev-chat-front">' + icon("message") + '<i></i><i></i><i></i></span>';
+    } else if (type === "account") {
+      art = '<div class="ev-laptop">' + icon("lock") + '<span class="ev-dots"><i></i><i></i><i></i></span></div><i class="ev-laptop-base"></i>';
+    } else if (type === "card") {
+      label = "Просят фото карты";
+      art = '<span class="ev-camera-frame"><span class="ev-bank-card">' + icon("card") + '<i></i></span></span>';
+    } else if (type === "gift") {
+      art = '<span class="ev-gift"><i class="ev-gift-lid"></i><i class="ev-bow"></i><b></b></span><span class="ev-spark">✦</span>';
+    } else if (type === "transfer") {
+      art = '<span class="ev-wallet from">₽</span><span class="ev-wallet to">₽</span><span class="ev-transfer">' + icon("transfer") + '</span>';
+    } else if (type === "browser") {
+      label = v.variant === "email" ? "Письмо со ссылкой" : "Прислали ссылку";
+      art = '<span class="ev-window"><i></i>' + icon(v.variant === "email" ? "mail" : "globe") + '</span>';
+    } else if (type === "notification") {
+      label = "Уведомление";
+      art = '<span class="ev-notice">' + icon(v.variant === "calendar" ? "calendar" : "bell") + '<i></i></span>';
+    } else {
+      label = "На твоём пути";
+      art = '<span class="ev-big-coin">' + icon("coin") + '</span><i class="ev-coin-shadow"></i>';
+    }
+    label = v.label || label;
+    var sender = v.sender || (type === "browser" ? v.address : "");
+    return '<div class="ev-scene"><div class="ev-art" aria-hidden="true">' + art + '</div><div class="ev-copy"><div class="ev-eyebrow">' + escape(label) + '</div>' +
+      (sender ? '<div class="ev-sender">' + escape(sender) + '</div>' : '') + '<p class="ev-words">' + escape(s.text) + '</p></div></div>';
+  }
+
+  function create(root, options) {
+    options = options || {};
+    var shown = false, fill = null, stamp = null, countdown = null, lastSecond = -1;
+    function show(s) {
+      shown = true; lastSecond = -1;
+      var type = (s.visual || {}).type;
+      if (!types[type]) type = "chat";
+      root.className = "event-stage ev-type-" + type + (options.preview ? " event-preview" : "");
+      root.innerHTML = '<div class="ev-shell">' + scene(s, type) + '<div class="ev-result" hidden></div></div><div class="ev-timing" aria-hidden="true"><div><span></span></div><small>Выбери действие на дорожке</small></div>';
+      root.setAttribute("aria-label", types[type].label + ": " + s.text);
+      fill = root.querySelector(".ev-timing span"); stamp = root.querySelector(".ev-result");
+      countdown = root.querySelector(".ev-timing small");
+    }
+    function hide() { shown = false; root.classList.add("hidden"); }
+    function resolve(correct) {
+      if (!shown) return;
+      root.classList.add(correct ? "ev-success" : "ev-miss");
+      stamp.hidden = false;
+      stamp.innerHTML = correct ? icon("check") + "Верное решение" : "Разберёмся вместе";
+    }
+    function update(progress, remaining) {
+      if (fill) fill.style.transform = "scaleX(" + Math.max(0, Math.min(1, 1 - progress)) + ")";
+      var second = Math.max(0, Math.ceil(remaining || 0));
+      if (countdown && second !== lastSecond) {
+        countdown.textContent = "Выбери действие · " + second + " с";
+        lastSecond = second;
+      }
+    }
+    return { show: show, hide: hide, resolve: resolve, update: update,
+      destroy: function () { hide(); root.innerHTML = ""; fill = stamp = countdown = null; } };
+
+  }
+  window.GameEvents = { create: create, types: types, icon: icon };
+})();
+
+</script>
+  <script>
+/* Независимая модель бега: дорожки, прыжки, препятствия и собираемые монеты. */
+(function (root) {
+  "use strict";
+  var JUMP_TIME = 0.92, JUMP_HEIGHT = 106, BARRIER_CLEARANCE = 43;
+  var HIT_START = 0.985, HIT_END = 1.02, EXIT = 1.07;
+  function create(random) {
+    random = random || Math.random;
+    var course = { obstacles: [], coins: [], time: 0, duration: 10, round: 0, ready: false, jumpTime: -1, jumpHeight: 0, invulnerable: 0, rowsSpawned: 0, objectsSpawned: 0 };
+    var nextSpawn = 0, count = 0, travel = 1, gap = 1, rowCount = 5, lastSafeLane = 1, serial = 0;
+    function coin(lane, p, height, barrierId, value) {
+      var item = { id: serial++, type: "coin", lane: lane, p: p, height: height || 30, airborne: !!height, barrierId: barrierId, value: value || 1, travel: travel, collected: false };
+      course.coins.push(item);
+      return item;
+    }
+    function jumpBonus(lane, barrierId) {
+      // Одна монета X5 на вершине прыжка, в той же плоскости, что и барьер.
+      coin(lane, 0, 34 + JUMP_HEIGHT, barrierId, 5);
+    }
+    course.begin = function (round, seconds, speedMultiplier) {
+      course.obstacles.length = 0; course.coins.length = 0;
+      course.time = 0; course.duration = Math.max(10, seconds || 10); course.round = round; course.ready = false;
+      course.jumpTime = -1; course.jumpHeight = 0; course.invulnerable = 0;
+      course.rowsSpawned = 0; course.objectsSpawned = 0;
+      // Та же базовая скорость сближения, ускоренная вместе с дорогой в 1,5 раза.
+      travel = Math.max(2.8, 3.5 - round * 0.07) / (speedMultiplier || 1.5);
+      rowCount = round === 0 ? 5 : round < 3 ? 7 : 8;
+      nextSpawn = 0.55; count = 0; lastSafeLane = 1; serial = 0;
+      gap = (course.duration - 0.45 - travel * EXIT - nextSpawn) / (rowCount - 1);
+      // Первые монеты видны сразу; до первого препятствия остаётся время для манёвра.
+      coin(1, 0.55); coin(1, 0.42); coin(1, 0.29);
+    };
+    course.jump = function () {
+      if (course.jumpTime >= 0 || course.ready) return false;
+      course.jumpTime = 0;
+      return true;
+    };
+    function spawnRow() {
+      // Монеты подсказывают проходимый маршрут. Между рядами он смещается максимум на одну дорожку.
+      var routes = [0, 1, 2].filter(function (lane) { return Math.abs(lane - lastSafeLane) <= 1; });
+      if (course.round === 0 && count === 0) routes = [0, 2];
+      var safe = routes[Math.floor(random() * routes.length)];
+      var blocked = [0, 1, 2].filter(function (lane) { return lane !== safe; });
+      var lane = course.round === 0 && count === 0 ? 1 : blocked[Math.floor(random() * blocked.length)];
+      // Плотность выше примерно в 1,5 раза: 11 / 17 / 20 объектов за отрезок.
+      // Между обязательными прыжками всегда есть обычный ряд для приземления.
+      var requiresJump = course.round === 0 ? count === 2 : course.round < 3 ? count >= 2 && count % 2 === 0 : count % 2 === 1;
+      var type = requiresJump || count % 2 === 0 ? "barrier" : "crate";
+      var row = { id: count, hit: false, jumped: false, safeLane: safe, requiresJump: requiresJump };
+      function obstacle(at, kind, secondary) {
+        course.obstacles.push({ lane: at, type: kind, row: row, p: 0, checked: false, hit: false, jumped: false, travel: travel, noReward: !!secondary });
+        course.objectsSpawned++;
+      }
+      if (requiresJump) lane = safe;
+      obstacle(lane, type, false);
+      if (requiresJump) {
+        obstacle(blocked[0], "crate", true);
+        obstacle(blocked[1], "crate", true);
+      } else {
+        var second = blocked[0] === lane ? blocked[1] : blocked[0];
+        obstacle(second, type === "barrier" ? "crate" : "barrier", true);
+      }
+      if (!requiresJump) for (var c = 0; c < 4; c++) coin(safe, 0.25 - c * 0.1).rowId = count;
+      // Поздние участки оставляют промежуточные ряды без бонусного прыжка.
+      if (requiresJump || (course.round < 3 && type === "barrier" && (Math.floor(count / 2) + course.round) % 2 === 0)) jumpBonus(lane, count);
+      lastSafeLane = safe; count++; course.rowsSpawned = count; nextSpawn += gap;
+    }
+    course.update = function (dt, playerLane, playerRadius) {
+      var events = [];
+      course.time += dt;
+      course.invulnerable = Math.max(0, course.invulnerable - dt);
+      if (course.jumpTime >= 0) {
+        course.jumpTime += dt;
+        var t = Math.min(1, course.jumpTime / JUMP_TIME);
+        course.jumpHeight = 4 * JUMP_HEIGHT * t * (1 - t);
+        if (t === 1) { course.jumpTime = -1; course.jumpHeight = 0; events.push({ type: "land" }); }
+      }
+      if (count < rowCount && course.time >= nextSpawn) spawnRow();
+      for (var i = course.obstacles.length - 1; i >= 0; i--) {
+        var o = course.obstacles[i], old = o.p;
+        o.p += dt / o.travel;
+        if (!o.checked && o.p >= HIT_START) {
+          var overlap = Math.abs(playerLane - o.lane) < 0.29 + (playerRadius || 0.18);
+          var clears = o.type === "barrier" && course.jumpHeight >= BARRIER_CLEARANCE;
+          // Проверяется пересечение интервала глубины, чтобы на редком кадре не проскочить объект.
+          if (old <= HIT_END && overlap) {
+            if (clears) { o.jumped = true; o.row.jumped = true; }
+            else {
+              o.hit = true; o.row.hit = true; o.checked = true;
+              if (course.invulnerable === 0) {
+                events.push({ type: "hit", obstacle: o });
+                course.invulnerable = 0.75;
+              }
+            }
+          }
+          if (o.p > HIT_END) {
+            o.checked = true;
+            if (!o.row.hit && !o.noReward) events.push({ type: "clear", jumped: o.row.jumped, obstacle: o });
+          }
+        }
+        if (o.p > EXIT) course.obstacles.splice(i, 1);
+      }
+      for (i = course.coins.length - 1; i >= 0; i--) {
+        var c = course.coins[i], before = c.p;
+        c.p += dt / c.travel;
+        if (before <= HIT_END && c.p >= HIT_START && Math.abs(playerLane - c.lane) < 0.36 && Math.abs(course.jumpHeight + 34 - c.height) < 43) {
+          c.collected = true;
+          events.push({ type: "coin", coin: c });
+          course.coins.splice(i, 1);
+        } else if (c.p > EXIT) course.coins.splice(i, 1);
+      }
+      course.ready = course.time >= course.duration && course.obstacles.length === 0 && course.coins.length === 0 && course.jumpTime < 0;
+      return events;
+    };
+    return course;
+  }
+  var api = { create: create, jumpTime: JUMP_TIME, jumpHeight: JUMP_HEIGHT, barrierClearance: BARRIER_CLEARANCE };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  else root.RunnerCourse = api;
+})(typeof window !== "undefined" ? window : this);
+
+</script>
+  <script>
+/* Живой квартал: процедурные Canvas-фасады, витрины, жители и коты. */
+(function () {
+  "use strict";
+  var COLORS = [
+    { front: "#f1f5ff", side: "#cad9ef", roof: "#a7bfde", accent: "#7350ff" },
+    { front: "#fae8f0", side: "#e1c7e2", roof: "#c39fc6", accent: "#ff85a2" },
+    { front: "#ecfaed", side: "#b5d9c7", roof: "#a1c5ad", accent: "#f6bd43" },
+    { front: "#fff1d9", side: "#e7d4b1", roof: "#d2b786", accent: "#6faef4" }
+  ];
+  function seeded(a) { var x = Math.sin(a * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+  function rect(ctx, x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+  function quad(ctx, a, b, c, d, fill) {
+    ctx.fillStyle=fill; ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.lineTo(c[0],c[1]);ctx.lineTo(d[0],d[1]);ctx.closePath();ctx.fill();
+  }
+  // Original human characters: eight friendly reactions, one occupied house in three.
+  var REACTIONS = ["67", "Даб!", "Ну как?", "Ой!", "Лайк!", "Лови ♥", "Бип-буп", "Круто!"];
+  function hasResident(id) { return ((id % 3) + 3) % 3 === 0; }
+  function residentKind(id) { return ((Math.floor(id / 3) % REACTIONS.length) + REACTIONS.length) % REACTIONS.length; }
+  function resident(ctx, x, sillY, scale, id, view, bubble, layer) {
+    var kind = residentKind(id);
+    var rhythm = view.reduced ? .45 : Math.sin(view.time * 5.4 + id * 1.7);
+    var lean = view.reduced ? 0 : Math.sin(view.time * 2.7 + id) * 1.8;
+    var lift = view.reduced ? 11 : 11 + Math.min(1, view.cheer || 0) * 2;
+    var shirt = ["#ffca67", "#78e3c1", "#d3adff", "#93c9ff", "#ff9cac", "#afe386", "#ffd283", "#b8bcff"][kind];
+    var skin = ["#edb68e", "#bd805c", "#f4cfab"][Math.abs(id) % 3];
+    ctx.save(); ctx.translate(x, sillY); ctx.scale(scale, scale);
+    ctx.translate(lean, -2);
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (layer === "inside") {
+      // Тело и плечи рисуются внутри проёма; нижняя часть скрыта стеной и подоконником.
+      ctx.fillStyle = "#050f1c66"; ctx.beginPath(); ctx.ellipse(1, -25, 23, 38, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = "#203c43"; ctx.lineWidth = 2;
+      var torsoShade = ctx.createLinearGradient(0,-28,0,24);
+      torsoShade.addColorStop(0,shirt); torsoShade.addColorStop(.45,shirt); torsoShade.addColorStop(1,"#102b35");
+      ctx.fillStyle = torsoShade; rect(ctx, -14, -30, 28, 58, 10); ctx.fill();
+      ctx.beginPath();ctx.moveTo(-14,-8);ctx.lineTo(-14,-20);ctx.quadraticCurveTo(-14,-30,-4,-30);ctx.lineTo(4,-30);ctx.quadraticCurveTo(14,-30,14,-20);ctx.lineTo(14,-8);ctx.stroke();
+      ctx.fillStyle = skin; rect(ctx, -5, -38, 10, 12, 3); ctx.fill();
+      ctx.fillStyle = "#ffffff66"; ctx.fillRect(-6, -18, 12, 4);
+      for (var arm = -1; arm <= 1; arm += 2) {
+        ctx.strokeStyle = "#203c43"; ctx.lineWidth = 10;
+        ctx.beginPath(); ctx.moveTo(arm*11, -25); ctx.lineTo(arm*23, -28); ctx.stroke();
+        ctx.strokeStyle = shirt; ctx.lineWidth = 7; ctx.stroke();
+      }
+      ctx.restore(); return;
+    }
+    // Hands stay anchored to shoulders; poses never detach the torso from the room.
+    function hands() {
+      for (var hand = -1; hand <= 1; hand += 2) {
+        var palmX = hand * 35, palmY = -39 + rhythm * hand * lift, palmTilt = hand * -.12;
+        if (kind === 1) { palmX = hand < 0 ? 8 : 40; palmY = hand < 0 ? -44 : -61 + rhythm*3; }
+        if (kind === 2) { palmY = -43 + rhythm*2; }
+        if (kind === 3) { palmX = hand > 0 ? 2 : -30; palmY = hand > 0 ? -49 + rhythm*2 : -20; palmTilt = hand > 0 ? -1 : 0; }
+        if (kind === 4) { palmX = hand*31; palmY = hand > 0 ? -45 + rhythm*3 : -22; palmTilt = hand > 0 ? 1.4 : 0; }
+        if (kind === 5) { palmX = hand*6; palmY = -22 + rhythm; palmTilt = -hand*.65; }
+        if (kind === 6) { palmX = hand*37; palmY = -33 + rhythm*hand*16; palmTilt = hand*1.4; }
+        if (kind === 7) { palmX = hand*30; palmY = -24 + rhythm*2; }
+        ctx.strokeStyle = "#203c43"; ctx.lineWidth = 8;
+        ctx.beginPath(); ctx.moveTo(hand*23,-28);
+        if (kind === 6) ctx.lineTo(hand*23,palmY);
+        ctx.lineTo(palmX,palmY+3); ctx.stroke();
+        ctx.strokeStyle = skin; ctx.lineWidth = 5; ctx.stroke();
+        ctx.fillStyle = skin; ctx.beginPath(); ctx.ellipse(palmX,palmY,kind===3?8:9,4,palmTilt,0,Math.PI*2); ctx.fill();
+        ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(palmX-hand*5,palmY);
+        ctx.lineTo(palmX-hand*7,palmY-(kind===4&&hand>0?13:4)); ctx.stroke();
+      }
+    }
+    if (kind !== 1 && kind !== 3 && kind !== 5) hands();
+    ctx.fillStyle = skin; ctx.beginPath(); ctx.arc(0, -43, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#203c43"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#403039"; ctx.beginPath(); ctx.arc(0, -46, 14, Math.PI, Math.PI * 2); ctx.lineTo(12, -45); ctx.quadraticCurveTo(5, -47, 2, -52); ctx.quadraticCurveTo(-3, -45, -13, -46); ctx.fill();
+    ctx.fillStyle = "#fff9e8";
+    ctx.beginPath(); ctx.ellipse(-5, -43, 3.5, 4.5, 0, 0, Math.PI * 2); ctx.ellipse(5, -43, 3.5, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#27343b"; ctx.beginPath(); ctx.arc(-4, -42, 1.9, 0, Math.PI * 2); ctx.arc(6, -42, 1.9, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#773f34"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(1, -38, 4, .1, Math.PI - .1); ctx.stroke();
+    ctx.fillStyle = "#e58f7866"; ctx.beginPath(); ctx.ellipse(-9, -37, 3, 2, 0, 0, Math.PI * 2); ctx.ellipse(10, -37, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
+    if (kind === 7) {
+      ctx.fillStyle="#302758"; rect(ctx,-12,-49,11,9,3);ctx.fill();rect(ctx,1,-49,11,9,3);ctx.fill();
+      ctx.strokeStyle="#302758";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-2,-46);ctx.lineTo(2,-46);ctx.stroke();
+      ctx.strokeStyle="#fff";ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(-9,-46);ctx.lineTo(-6,-44);ctx.moveTo(4,-46);ctx.lineTo(7,-44);ctx.stroke();
+    }
+    if (kind === 2) { ctx.strokeStyle="#403039";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-9,-51);ctx.lineTo(-3,-53);ctx.moveTo(3,-53);ctx.lineTo(9,-51);ctx.stroke(); }
+    if (kind === 1 || kind === 3 || kind === 5) hands();
+    if (kind === 5) {
+      ctx.fillStyle="#f26d91";ctx.beginPath();ctx.moveTo(0,-16);ctx.bezierCurveTo(-17,-25,-4,-35,0,-27);ctx.bezierCurveTo(4,-35,17,-25,0,-16);ctx.fill();
+    }
+    if (bubble) {
+      var bob = view.reduced ? 0 : Math.sin(view.time * 2.7 + id) * 2;
+      ctx.globalAlpha = bubble;
+      ctx.translate(0, bob);
+      var bubbleWidth = Math.max(58, REACTIONS[kind].length * 9 + 18);
+      ctx.fillStyle = "#061d2866"; rect(ctx, -bubbleWidth/2+2, -103, bubbleWidth, 34, 12); ctx.fill();
+      ctx.fillStyle = "#fff3ce"; ctx.strokeStyle = "#d5b56c"; ctx.lineWidth = 1.5;
+      rect(ctx, -bubbleWidth/2, -106, bubbleWidth, 34, 12); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-7, -73); ctx.lineTo(-3, -65); ctx.lineTo(6, -73); ctx.fill();
+      ctx.fillStyle = "#163d43"; ctx.font = "900 " + (kind === 0 ? 26 : 16) + "px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(REACTIONS[kind], 0, -88);
+    }
+    ctx.restore();
+  }
+  function cat(ctx,x,y,s,time,id,reduced) {
+    ctx.save();ctx.translate(x,y);ctx.scale(s,s);
+    ctx.strokeStyle="#e4be82";ctx.lineWidth=3;ctx.lineCap="round";
+    ctx.beginPath();ctx.moveTo(5,4);ctx.quadraticCurveTo(18,9,16+(reduced?0:Math.sin(time*2+id)*3),-6);ctx.stroke();
+    ctx.fillStyle="#e4be82";ctx.beginPath();ctx.ellipse(0,4,8,6,0,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.moveTo(-7,-1);ctx.lineTo(-8,-12);ctx.lineTo(-2,-8);ctx.lineTo(3,-8);ctx.lineTo(8,-12);ctx.lineTo(7,-1);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#183b3d";var eye=!reduced&&(time+id)%4<.15?1:2.5;ctx.fillRect(-4,-5,2,eye);ctx.fillRect(3,-5,2,eye);
+    ctx.restore();
+  }
+  function shopIcon(ctx, type, x, y, s) {
+    ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.strokeStyle="#f7e7ba";ctx.fillStyle="#f7e7ba";ctx.lineWidth=2;
+    if(type===0){ // книжная лавка
+      ctx.beginPath();ctx.moveTo(0,8);ctx.lineTo(-10,5);ctx.lineTo(-10,-8);ctx.lineTo(0,-5);ctx.lineTo(10,-8);ctx.lineTo(10,5);ctx.closePath();ctx.stroke();ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(0,8);ctx.stroke();
+    }else if(type===1){ // мороженое
+      ctx.fillStyle="#e9bf70";ctx.beginPath();ctx.moveTo(-6,0);ctx.lineTo(6,0);ctx.lineTo(0,12);ctx.closePath();ctx.fill();ctx.fillStyle="#eeadad";ctx.beginPath();ctx.arc(0,-4,8,Math.PI,0);ctx.lineTo(8,0);ctx.lineTo(-8,0);ctx.fill();
+    }else{ // цветы
+      ctx.strokeStyle="#a0d5a7";ctx.beginPath();ctx.moveTo(0,10);ctx.lineTo(0,-5);ctx.stroke();ctx.fillStyle="#f4c86c";for(var i=0;i<5;i++){var a=i*Math.PI*2/5;ctx.beginPath();ctx.arc(Math.cos(a)*5,-5+Math.sin(a)*5,3.5,0,Math.PI*2);ctx.fill();}ctx.fillStyle="#d7877d";ctx.beginPath();ctx.arc(0,-5,3,0,Math.PI*2);ctx.fill();
+    }ctx.restore();
+  }
+  var HOUSE_DEPTH = .235, HOUSE_SPACING = .27;
+  function nearPlane(view) { return 1 + (1 - .32) / view.perspective; }
+  function scaleAt(view, p) { return 1 / (1 + (1 - p) * view.perspective); }
+  function project(view, point) {
+    var r = scaleAt(view, point[2]);
+    return [view.sxAt(point[0], r), view.yOf(r) + (36 - point[1]) * r];
+  }
+  // Отсекаем геометрию у камеры, а не весь дом по передней грани.
+  // Его задняя часть остаётся на экране и продолжает проходить мимо игрока.
+  function clipNear(points, limit) {
+    var clipped = [], a = points[points.length - 1];
+    for (var i = 0; i < points.length; i++) {
+      var b = points[i], insideA = a[2] <= limit, insideB = b[2] <= limit;
+      if (insideA !== insideB) {
+        var t = (limit - a[2]) / (b[2] - a[2]);
+        clipped.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, limit]);
+      }
+      if (insideB) clipped.push(b);
+      a = b;
+    }
+    return clipped;
+  }
+  function polygonPath(ctx, view, points) {
+    var clipped = clipNear(points, nearPlane(view));
+    if (clipped.length < 3) return false;
+    ctx.beginPath();
+    for (var i = 0; i < clipped.length; i++) {
+      var pt = project(view, clipped[i]);
+      if (i === 0) ctx.moveTo(pt[0], pt[1]); else ctx.lineTo(pt[0], pt[1]);
+    }
+    ctx.closePath(); return true;
+  }
+  function polygon(ctx, view, points, fill) {
+    if (polygonPath(ctx, view, points)) { ctx.fillStyle = fill; ctx.fill(); }
+  }
+  function buildings(view) {
+    var travel = view.scroll / (view.height * .8) * .38;
+    var result = [];
+    for (var side = -1; side <= 1; side += 2) {
+      var offset = side < 0 ? -.05 : -.13;
+      var first = Math.ceil((-.22 - travel - offset) / HOUSE_SPACING);
+      var last = Math.floor((nearPlane(view) + HOUSE_DEPTH - travel - offset) / HOUSE_SPACING);
+      for (var index = first; index <= last; index++) {
+        result.push({ side: side, p: index * HOUSE_SPACING + travel + offset, id: index * 2 + (side > 0 ? 1 : 0) + 80 });
+      }
+    }
+    // Один мировой номер на весь путь: при смене квартала окна/цвета не перескакивают.
+    return result.sort(function(a, b) { return a.p - b.p; });
+  }
+  function house(ctx, view, building) {
+    var side = building.side, p = building.p, id = building.id;
+    var depth = HOUSE_DEPTH, width = 146, height = 328 + seeded(id + 3) * 62;
+    var inner = view.width / 2 + side * (view.roadWidth / 2 + 29), outer = inner + side * width;
+    var backP = p - depth, palette = COLORS[((id % 4) + 4) % 4];
+    function wallPoints(u0, u1, low, high) {
+      return [[inner, low, p-u0*depth], [inner, low, p-u1*depth], [inner, high, p-u1*depth], [inner, high, p-u0*depth]];
+    }
+    function wall(u0, u1, low, high, fill) { polygon(ctx, view, wallPoints(u0,u1,low,high), fill); }
+    polygon(ctx, view, [[inner, height, p], [inner, height, backP], [outer, height, backP], [outer, height, p]], palette.roof);
+    wall(0, 1, 0, height, palette.side);
+    wall(0, 1, height-7, height, palette.accent);
+    wall(0, 1, 0, 10, "#afc3db");
+    // Этажи, окна и витрины имеют собственную глубину, как стены.
+    for (var floor = 0; floor < 3; floor++) {
+      var low = 91 + floor * 77;
+      wall(0, 1, low-10, low-7, "#ffffff0d");
+      if (floor === 1) continue; // Здесь одно открытое окно, без старых рам под ним.
+      for (var column = 0; column < 2; column++) {
+        var u0 = .08 + column * .48, u1 = u0 + .34;
+        var warm = seeded(id * 13 + floor * 2 + column) > .25;
+        wall(u0-.015, u1+.015, low-3, low+57, "#9badce");
+        wall(u0, u1, low, low+54, warm ? "#c4e9ff" : "#a5c8ec");
+        wall(u0+.15, u0+.17, low, low+54, palette.roof);
+        wall(u0-.03, u1+.03, low-6, low, palette.roof);
+      }
+    }
+    // Одно открытое окно: тёмная комната, откосы и раздвинутые занавески.
+    var sill = 155, characterP = p - depth * .35;
+    var opening = wallPoints(.22,.60,sill,sill+83);
+    wall(.185, .635, sill-6, sill+90, "#102832");
+    wall(.20, .62, sill-2, sill+87, "#f9fbff");
+    polygon(ctx, view, opening, "#102b35");
+    wall(.22, .60, sill+64, sill+83, "#f0bf6914");
+    wall(.22, .26, sill, sill+83, "#ad7257");
+    wall(.56, .60, sill, sill+83, "#ad7257");
+    wall(.235, .245, sill, sill+83, "#e2ae76");
+    wall(.575, .585, sill, sill+83, "#e2ae76");
+    wall(.22, .60, sill+78, sill+83, "#081d28");
+    if (!hasResident(id)) {
+      polygon(ctx, view, opening, "#c4e7fc");
+      wall(.405, .425, sill, sill+83, "#f9fbff");
+      wall(.22, .60, sill+39, sill+43, "#f9fbff");
+      wall(.245, .28, sill+7, sill+75, "#ffffff66");
+    }
+    // Передняя грань проходит за пределы кадра; после near plane остаётся боковая стена.
+    if (p <= nearPlane(view)) {
+      var r = scaleAt(view, p), a = project(view, [inner, 0, p]), b = project(view, [outer, height, p]);
+      var left = Math.min(a[0], b[0]), y = a[1], top = b[1], fw = width * r;
+      ctx.fillStyle = palette.front; ctx.fillRect(left, top, fw, height*r);
+      ctx.fillStyle = palette.accent; ctx.fillRect(left-3*r, top, fw+6*r, 7*r);
+      if (r > .17) {
+        for (var row = 0; row < 3; row++) for (var col = 0; col < 2; col++) {
+          var wx = left + (15 + col*65)*r, wy = top + (25 + row*77)*r, ww = 45*r, wh = 53*r;
+          var lit = seeded(id*19 + row*3 + col) > .23;
+          var glow = view.reduced ? .84 : .80 + .07*Math.sin(view.time*.65 + id+row+col);
+          ctx.fillStyle = "#8ea4cb"; rect(ctx, wx-3*r, wy-3*r, ww+6*r, wh+6*r, 3*r); ctx.fill();
+          ctx.fillStyle = lit ? "rgba(255,229,172,"+glow+")" : "#afd6f2"; ctx.fillRect(wx, wy, ww, wh);
+          ctx.fillStyle = lit ? "#b27b4e77" : "#62818944"; ctx.fillRect(wx,wy,6*r,wh); ctx.fillRect(wx+ww-6*r,wy,6*r,wh);
+          if (row === 1 && col === (Math.abs(id)%2)) {
+            cat(ctx,wx+ww*.5,wy+wh-12*r,1.55*r,view.time,id,view.reduced);
+          } else {
+            ctx.fillStyle = palette.roof; ctx.fillRect(wx+ww/2-r,wy,2*r,wh);
+          }
+          ctx.fillStyle = palette.roof; ctx.fillRect(wx-4*r,wy+wh,ww+8*r,5*r);
+          if (row === 2 && col === 0) {
+            ctx.fillStyle="#b77759";ctx.fillRect(wx+9*r,wy+wh-8*r,25*r,8*r);ctx.fillStyle="#8ac78a";
+            for(var leaf=0;leaf<3;leaf++){ctx.beginPath();ctx.ellipse(wx+(13+leaf*7)*r,wy+wh-10*r,4*r,7*r,leaf-1,0,Math.PI*2);ctx.fill();}
+          }
+        }
+        var sy = y-66*r;
+        ctx.fillStyle = "#9bbddd";ctx.fillRect(left+10*r,sy,fw-20*r,57*r);
+        ctx.fillStyle = "#ffffff77";ctx.fillRect(left+16*r,sy+6*r,fw-32*r,43*r);
+        for (var k=0;k<8;k++){ctx.fillStyle=k%2?"#e7ddb9":palette.accent;ctx.fillRect(left+(5+k*17)*r,sy-9*r,17*r,13*r);}
+        ctx.fillStyle=palette.side;rect(ctx,left+49*r,sy+5*r,48*r,36*r,6*r);ctx.fill();
+        shopIcon(ctx,Math.abs(id)%3,left+73*r,sy+24*r,1.1*r);
+      }
+    }
+    function sillLedge() {
+      var ledge = inner - side*9, nearP = p-.185*depth, farP = p-.635*depth;
+      // Толщина и верхняя плоскость подоконника дают читаемую глубину.
+      polygon(ctx,view,[[ledge,sill-7,nearP],[ledge,sill-7,farP],[ledge,sill+1,farP],[ledge,sill+1,nearP]],palette.roof);
+      polygon(ctx,view,[[inner,sill+1,nearP],[inner,sill+1,farP],[ledge,sill+1,farP],[ledge,sill+1,nearP]],"#ffffff");
+    }
+    sillLedge();
+    if (hasResident(id) && characterP <= nearPlane(view)) {
+      var cr = scaleAt(view, characterP), anchor = project(view, [inner, sill+8, characterP]);
+      if (cr > .27 && anchor[0] > -70*cr && anchor[0] < view.width+70*cr) {
+        ctx.save();ctx.globalAlpha = Math.min(1, (cr-.27)/.12);
+        ctx.save();
+        if (polygonPath(ctx,view,opening)) {
+          ctx.clip();
+          resident(ctx, anchor[0], anchor[1], cr*1.13, id, view, 0, "inside");
+        }
+        ctx.restore();
+        // Стена и подоконник закрывают торс, а голова и ладони находятся перед рамой.
+        sillLedge();
+        resident(ctx, anchor[0], anchor[1], cr*1.13, id, view, Math.max(0,Math.min(1,(cr-.38)/.10)), "outside");
+        ctx.restore();
+      }
+    }
+
+  }
+  function draw(ctx, view) {
+    var street = buildings(view);
+    ctx.save();ctx.beginPath();ctx.rect(0,0,view.width,view.height);ctx.clip();
+    for (var i=0; i<street.length; i++) house(ctx, view, street[i]);
+    ctx.restore();
+    var time=view.reduced?0:view.time, x=view.width*.77+Math.sin(time*.33)*9, y=view.height*.17+Math.sin(time*.7)*5;
+    ctx.strokeStyle="#d8d5a34d";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y+10);ctx.quadraticCurveTo(x-20,y+30,x-7,y+49);ctx.stroke();
+    quad(ctx,[x,y-11],[x+8,y],[x,y+12],[x-8,y],"#f2c76e");
+    quad(ctx,[x,y-11],[x,y+12],[x-8,y],[x,y-11],"#6ccfb3");
+  }
+  var api = {draw:draw, buildings:buildings, project:project, clipNear:clipNear, reactions:REACTIONS, hasResident:hasResident, residentKind:residentKind};
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else window.GameCity = api;
+})();
+
+</script>
+  <script>
+/* Оригинальные карманные зверушки. Все рисунки встроены, сеть не нужна. */
+(function () {
+  "use strict";
+  var rarities = {
+    uncommon: { name: "Необычная", color: "#84e5a4" },
+    rare: { name: "Редкая", color: "#82caff" },
+    super: { name: "Суперредкая", color: "#d5acff" },
+    mega: { name: "Мегаредкая", color: "#ffdc83" }
+  };
+  // Цена персонажа зависит только от редкости. Никакой случайности и ставок:
+  // ребёнок сам выбирает, кого купить, и получает ровно его (не азарт — обычная витрина).
+  var prices = { uncommon: 150, rare: 300, super: 600, mega: 900 };
+  function priceOf(pet) { return prices[pet.rarity]; }
+  var pets = [
+    { id: "listik", name: "Листик", rarity: "uncommon", kind: "leaf", color: "#77d98b", accent: "#297a58", bio: "Лесной ушастик выращивает дерево желаний по одному листочку.", skill: "Копим понемногу", tip: "Выбери мечту и откладывай на неё часть карманных денег. Даже маленькие суммы складываются!" },
+    { id: "kaplik", name: "Каплик", rarity: "uncommon", kind: "water", color: "#71d9ed", accent: "#3679bd", bio: "Водяной малыш собирает капельки и считает каждую.", skill: "Считаем расходы", tip: "Записывай, сколько денег получил и потратил. Так легче понять, сколько осталось." },
+    { id: "monetik", name: "Монетик", rarity: "uncommon", kind: "hamster", color: "#ffd49b", accent: "#bc864f", bio: "Хомячок с монеткой бережно хранит сдачу в щёчках.", skill: "Проверяем сдачу", tip: "После покупки вместе со взрослым проверь чек и сдачу. Остаток можно положить в копилку." },
+    { id: "planusha", name: "Планюша", rarity: "uncommon", kind: "turtle", color: "#a9dfb8", accent: "#508b79", bio: "Черепашка с панцирем-блокнотом всегда знает, за чем идёт в магазин.", skill: "Список покупок", tip: "Перед магазином составь список со взрослым. Он поможет помнить о нужном и не покупать всё подряд." },
+    { id: "iskrolis", name: "Искролис", rarity: "rare", kind: "fox", color: "#ffb36e", accent: "#e66d68", bio: "Огненный лисёнок умеет остудить даже самое горячее «хочу!».", skill: "Пауза перед покупкой", tip: "Увидел красивую вещь? Сделай паузу и подумай: она тебе нужна или просто понравилась прямо сейчас?" },
+    { id: "lunokot", name: "Лунокот", rarity: "rare", kind: "cat", color: "#b6b0fa", accent: "#7061c5", bio: "Лунный котик распутывает клубки подозрительных ссылок.", skill: "Проверяем ссылки", tip: "Пришла незнакомая ссылка? Не открывай её сразу — покажи взрослому, которому доверяешь." },
+    { id: "sravnysh", name: "Сравныш", rarity: "rare", kind: "owl", color: "#aacff4", accent: "#657fa8", bio: "Совёнок в очках замечает разницу даже между похожими ценниками.", skill: "Сравниваем цены", tip: "Вместе со взрослым сравни цену, размер и качество похожих вещей. Большая надпись «скидка» ещё не значит выгодно." },
+    { id: "parolik", name: "Паролик", rarity: "rare", kind: "hedgehog", color: "#d6b5ec", accent: "#8856a8", bio: "Ёжик с замочком прячет секреты за крепкими иголками.", skill: "Берегём пароли", tip: "Пароль и код из СМС — секреты. Не отправляй их в чат и не называй звонящему, даже если он представился банком." },
+    { id: "grozokryl", name: "Грозокрыл", rarity: "super", kind: "dragon", color: "#96b9ff", accent: "#7865dd", bio: "Грозовой дракончик закрывает друзей крыльями от чужого «срочно!».", skill: "Не спешим под давлением", tip: "Торопят перевести деньги или пугают? Остановись, закончи разговор и позови взрослого." },
+    { id: "kristalup", name: "Кристалуп", rarity: "super", kind: "crystal", color: "#9de9e0", accent: "#5399d6", bio: "Кристальный зайчик строит прозрачную лестницу к своей мечте.", skill: "Планируем цель", tip: "Узнай цену своей мечты. Со взрослым посчитай, сколько ещё нужно накопить и сколько получится откладывать." },
+    { id: "rezervik", name: "Резервик", rarity: "super", kind: "bear", color: "#98d6e8", accent: "#487eac", bio: "Ледяной медвежонок хранит запас снежинок на неожиданный тёплый день.", skill: "Оставляем запас", tip: "Необязательно тратить всё сразу. Оставь немного карманных денег на неожиданную нужную покупку." },
+    { id: "chekofin", name: "Чекофин", rarity: "super", kind: "fin", color: "#99e4dc", accent: "#418e9c", bio: "Дельфин с плавниками-чеками помнит каждую покупку.", skill: "Храним чек", tip: "Сохрани чек после покупки и отдай взрослому. Он поможет вспомнить цену и разобраться, если с вещью что-то не так." },
+    { id: "solnegrif", name: "Солнегриф", rarity: "mega", kind: "sun", color: "#ffda79", accent: "#f59664", bio: "Солнечный грифон делит лучи между делами, мечтами и добротой.", skill: "Распределяем деньги", tip: "Раздели карманные деньги на нужные покупки, мечту и запас. Со взрослым реши, сколько положить в каждую часть." },
+    { id: "zvezdoryu", name: "Звездорю", rarity: "mega", kind: "cosmic", color: "#c8a4ff", accent: "#7c63da", bio: "Звёздный дракон отличает настоящие звёзды от блестящих обманок.", skill: "Распознаём фальшивый приз", tip: "Обещают приз, но просят сначала заплатить или назвать данные карты? Не соглашайся и покажи сообщение взрослому." },
+    { id: "fenikash", name: "Феникаш", rarity: "mega", kind: "phoenix", color: "#ffc18b", accent: "#d56b78", bio: "Радужный феникс превращает промахи в новые полезные привычки.", skill: "Учимся на ошибках", tip: "Потратил деньги и пожалел? Расскажи взрослому и подумай, что сделаешь иначе в следующий раз. Ошибки помогают учиться." },
+    { id: "shchitorn", name: "Щиторн", rarity: "mega", kind: "unicorn", color: "#dfd7ff", accent: "#9c7cca", bio: "Единорог со щитом зовёт команду, когда одному трудно разобраться.", skill: "Обращаемся за помощью", tip: "Если речь о деньгах и что-то непонятно или тревожно, спроси взрослого, которому доверяешь. Просить помощи — полезный навык." }
+  ];
+
+  function art(pet) {
+    var extra = {
+      leaf: '<path d="M65 91Q34 24 73 39L91 88M109 86Q116 22 139 39L130 98" fill="' + pet.color + '"/><path d="M90 52Q98 16 126 27Q124 53 90 52" fill="' + pet.accent + '"/>',
+      water: '<path d="M78 91Q53 66 74 38Q77 63 98 69M122 84Q152 55 142 38Q170 72 137 97" fill="' + pet.color + '"/><circle cx="41" cy="106" r="9" fill="#bbf5ff"/><circle cx="160" cy="65" r="6" fill="#bbf5ff"/>',
+      fox: '<path d="M134 137Q196 151 166 76Q156 112 129 103" fill="' + pet.accent + '"/><path d="M166 76Q181 102 176 116L156 107Z" fill="#fff0cf"/><path d="M64 88L55 27L96 65M108 65L148 27L137 92" fill="' + pet.color + '"/><path d="M68 69L64 45L84 67M119 68L139 45L134 72" fill="' + pet.accent + '"/>',
+      cat: '<path d="M137 139Q176 157 167 113Q164 104 158 112" fill="none" stroke="' + pet.accent + '" stroke-width="13"/><path d="M62 91L61 35L94 65M108 65L140 35L140 94" fill="' + pet.color + '"/>',
+      dragon: '<path d="M65 110L20 63L25 116L60 145M135 110L180 63L175 116L140 145" fill="' + pet.accent + '"/><path d="M23 73L49 120L31 111M177 73L151 120L169 111" fill="' + pet.color + '"/><path d="M74 77L76 40L94 67M109 67L124 40L130 80" fill="#ffe09b"/>',
+      crystal: '<path d="M68 85L59 35L78 18L93 78M108 78L122 18L141 35L133 87" fill="' + pet.color + '"/><path d="M62 39L78 24L81 67M121 67L123 24L138 39" fill="' + pet.accent + '"/><path d="M23 99L34 77L45 99L34 122Z M155 65L166 43L177 65L166 88Z" fill="#d1ffff"/>',
+      sun: '<path d="M62 116Q7 122 23 61L65 91M138 116Q193 122 177 61L135 91" fill="' + pet.accent + '"/><path d="M32 78L51 111M168 78L149 111" stroke="#ffeab3" stroke-width="7"/><path d="M67 72L57 43L83 53L100 24L117 53L143 43L133 76" fill="#ffe9aa"/>',
+      cosmic: '<path d="M62 112L18 51L26 119L63 147M138 112L182 51L174 119L137 147" fill="' + pet.accent + '"/><path d="M72 73L65 33L93 59M107 59L135 33L128 73" fill="' + pet.color + '"/><path d="M22 54L42 107M178 54L158 107" stroke="#b5eaff" stroke-width="4"/><path d="M43 35L47 45L57 49L47 53L43 63L39 53L29 49L39 45Z" fill="#ffdf85"/>',
+      hamster: '<circle cx="64" cy="63" r="22" fill="' + pet.accent + '"/><circle cx="136" cy="63" r="22" fill="' + pet.accent + '"/><circle cx="64" cy="63" r="13" fill="#ffd7d4"/><circle cx="136" cy="63" r="13" fill="#ffd7d4"/>',
+      turtle: '<ellipse cx="100" cy="127" rx="63" ry="41" fill="' + pet.accent + '"/><path d="M47 124L75 105L100 121L126 105L153 124M75 105L76 155M126 105L124 155" fill="none" stroke="' + pet.color + '" stroke-width="4"/><path d="M81 65L85 41L115 41L119 65" fill="' + pet.color + '"/>',
+      owl: '<path d="M54 96L43 47L88 63M112 63L157 47L146 96" fill="' + pet.accent + '"/><ellipse cx="51" cy="129" rx="17" ry="32" fill="' + pet.color + '"/><ellipse cx="149" cy="129" rx="17" ry="32" fill="' + pet.color + '"/>',
+      hedgehog: '<path d="M44 141L28 112L42 98L31 73L55 70L58 44L82 54L100 29L117 54L143 43L145 70L169 73L158 98L172 112L156 141Z" fill="' + pet.accent + '"/>',
+      bear: '<circle cx="63" cy="63" r="22" fill="' + pet.color + '"/><circle cx="137" cy="63" r="22" fill="' + pet.color + '"/><circle cx="63" cy="63" r="12" fill="' + pet.accent + '"/><circle cx="137" cy="63" r="12" fill="' + pet.accent + '"/>',
+      fin: '<path d="M64 125L23 101Q23 141 61 148M136 125L177 101Q177 141 139 148M90 65L105 26L125 70" fill="' + pet.accent + '"/>',
+      phoenix: '<path d="M61 135Q10 121 24 51L66 93M139 135Q190 121 176 51L134 93M76 74L65 38L91 52L100 22L112 52L139 38L125 76" fill="' + pet.accent + '"/><path d="M27 67L48 114M173 67L152 114" stroke="#ffe9a0" stroke-width="6"/><path d="M81 153L73 184L100 169L128 184L119 153" fill="#ffda79"/>',
+      unicorn: '<path d="M66 86L54 41L86 65M114 65L146 41L134 86" fill="' + pet.color + '"/><path d="M88 67L100 15L112 67Z" fill="#ffe49c"/><path d="M95 40L106 45M92 53L109 58" stroke="#dcaa61" stroke-width="3"/><path d="M139 80Q164 88 151 116L141 139" fill="none" stroke="' + pet.accent + '" stroke-width="16"/>'
+    };
+    var emblem = pet.kind === "cat" ? '<path d="M105 72A12 12 0 1 1 92 59A10 10 0 0 0 105 72" fill="#fff0b5"/>' :
+      '<path d="M100 61L104 70L114 72L107 79L109 89L100 84L91 89L93 79L86 72L96 70Z" fill="#fff5cf"/>';
+    var badge = {
+      hamster: '<circle cx="100" cy="140" r="15" fill="#ffe391" stroke="#bc864f" stroke-width="3"/><path d="M97 134L102 131V149M97 149H107" stroke="#946029" stroke-width="3" fill="none"/>',
+      turtle: '<rect x="86" y="130" width="28" height="23" rx="4" fill="#fff3c7"/><path d="M91 137H109M91 144H104" stroke="#508b79" stroke-width="2"/>',
+      owl: '<g fill="none" stroke="#344b72" stroke-width="3"><circle cx="79" cy="100" r="15"/><circle cx="121" cy="100" r="15"/><path d="M94 99H106"/></g>',
+      hedgehog: '<rect x="88" y="135" width="24" height="19" rx="4" fill="#ffe6a2"/><path d="M93 135V130A7 7 0 0 1 107 130V135" fill="none" stroke="#ffe6a2" stroke-width="4"/><circle cx="100" cy="144" r="3" fill="#8856a8"/>',
+      bear: '<path d="M88 138L100 125L112 138L100 153Z" fill="#e6fbff"/><path d="M100 130V148M93 138H107" stroke="#487eac" stroke-width="2"/>',
+      fin: '<path d="M88 128H113V156L108 152L103 156L98 152L93 156L88 152Z" fill="#f4ffff"/><path d="M93 136H108M93 143H105" stroke="#418e9c" stroke-width="2"/>',
+      unicorn: '<path d="M100 126L116 132V141Q115 153 100 159Q85 153 84 141V132Z" fill="#fff0bf"/><path d="M93 141L98 146L108 135" stroke="#9c7cca" stroke-width="3" fill="none"/>'
+    };
+    return '<svg viewBox="0 0 200 190" role="img" aria-label="' + pet.name + '" xmlns="http://www.w3.org/2000/svg">' +
+      '<ellipse cx="100" cy="171" rx="53" ry="9" fill="#000" opacity=".18"/>' + extra[pet.kind] +
+      '<ellipse cx="100" cy="124" rx="43" ry="44" fill="' + pet.accent + '"/>' +
+      '<ellipse cx="100" cy="129" rx="29" ry="30" fill="#fff" opacity=".45"/>' +
+      '<ellipse cx="69" cy="161" rx="17" ry="10" fill="' + pet.color + '"/><ellipse cx="131" cy="161" rx="17" ry="10" fill="' + pet.color + '"/>' +
+      '<rect x="52" y="58" width="96" height="79" rx="37" fill="' + pet.color + '"/>' + emblem +
+      '<ellipse cx="79" cy="99" rx="8" ry="11" fill="#fff"/><ellipse cx="121" cy="99" rx="8" ry="11" fill="#fff"/>' +
+      '<ellipse cx="81" cy="101" rx="5" ry="7" fill="#203049"/><ellipse cx="119" cy="101" rx="5" ry="7" fill="#203049"/>' +
+      '<circle cx="82" cy="98" r="2" fill="#fff"/><circle cx="120" cy="98" r="2" fill="#fff"/>' +
+      '<ellipse cx="68" cy="115" rx="8" ry="4" fill="#ff8b9a" opacity=".65"/><ellipse cx="132" cy="115" rx="8" ry="4" fill="#ff8b9a" opacity=".65"/>' +
+      '<path d="M93 115Q100 123 107 115" fill="none" stroke="#203049" stroke-width="3" stroke-linecap="round"/>' + (badge[pet.kind] || "") + '</svg>';
+  }
+  // Wallet exists only for the current result screen; no persistence or real money.
+  function createWallet() {
+    var wallet = { balance: 0, pets: [], pending: null };
+    wallet.begin = function (coins) { wallet.balance = Math.max(0, Math.floor(coins || 0)); wallet.pets = []; wallet.pending = null; };
+    wallet.owns = function (id) { return wallet.pets.some(function (p) { return p.id === id; }); };
+    // Покупка конкретного выбранного персонажа. Без случайности: получаешь ровно того,
+    // кого выбрал. Нельзя купить дважды, нельзя уйти в минус, нельзя списать во время показа.
+    wallet.buy = function (id) {
+      var pet = pets.find(function (p) { return p.id === id; });
+      if (!pet || wallet.pending || wallet.owns(id) || wallet.balance < priceOf(pet)) return null;
+      wallet.balance -= priceOf(pet); wallet.pending = { pet: pet };
+      return wallet.pending;
+    };
+    wallet.reveal = function () {
+      if (!wallet.pending) return null;
+      var pet = wallet.pending.pet; wallet.pets.push(pet); wallet.pending = null; return pet;
+    };
+    return wallet;
+  }
+  var api = { rarities: rarities, prices: prices, priceOf: priceOf, pets: pets, art: art, createWallet: createWallet };
+  if (typeof module === "object" && module.exports) module.exports = api;
+  else window.RunRewards = api;
+})();
+
+</script>
+  <script>
+/* Result-screen shop. Gameplay coins are earned locally and reset with each run.
+   Витрина выбора: ребёнок сам выбирает персонажа и покупает его за монеты.
+   Никакой случайности, барабанов или ставок — получаешь ровно того, кого выбрал. */
+(function () {
+  "use strict";
+  function create(reduced) {
+    var data = window.RunRewards, wallet = data.createWallet();
+    var active = false, returnTo = null, selected = null;
+    function $(id) { return document.getElementById(id); }
+    function resetAnimation() {
+      $("reward-opening").classList.add('hidden');
+      $("reward-reel").classList.add('hidden');
+      $("reward-reel").classList.remove('spinning', 'settled');
+      $("reel-track").innerHTML = '';
+      $("reel-track").style.transform = '';
+      $("reward-dialog").classList.remove('celebrating');
+    }
+    function celebration() {
+      var markup = '<span class="pet-aura" aria-hidden="true"></span><span class="reward-burst" aria-hidden="true">';
+      var colors = ['#ffd23f', '#9875ff', '#6bdab7', '#ffa2c3'];
+      for (var i = 0; i < 16; i++) {
+        var angle = i * Math.PI * 2 / 16;
+        markup += '<i style="--dx:' + (Math.cos(angle) * (100 + i % 3 * 12)).toFixed(1) + 'px;--dy:' + (Math.sin(angle) * 87 - 15).toFixed(1) + 'px;--turn:' + (i * 71) + 'deg;--delay:' + (i % 4 * .035) + 's;--confetti:' + colors[i % 4] + '">' + (i % 3 === 0 ? '✦' : '') + '</i>';
+      }
+      return markup + '</span>';
+    }
+    function render() {
+      $("shop-balance").textContent = wallet.balance;
+      // Витрина: все персонажи с ценой. Купленных нельзя купить снова; не хватает монет — видно сколько.
+      $("chest-list").innerHTML = data.pets.map(function (pet) {
+        var rarity = data.rarities[pet.rarity], price = data.priceOf(pet);
+        var owned = wallet.owns(pet.id), missing = Math.max(0, price - wallet.balance);
+        var disabled = owned || missing > 0 || wallet.pending;
+        var status = owned ? '✓ Уже твой' : missing ? 'Ещё ' + missing : 'Купить';
+        var label = pet.name + ', ' + rarity.name + (owned ? ', уже твой' : ', ' + price + ' монет' + (missing ? ', не хватает ' + missing : ''));
+        return '<button class="pet-buy' + (owned ? ' owned' : '') + '" data-buy="' + pet.id + '"' + (disabled ? ' disabled' : '') +
+          ' style="--pet-color:' + rarity.color + '" aria-label="' + label + '">' +
+          '<span class="pet-thumb">' + data.art(pet) + '</span>' +
+          '<span class="pet-buy-name">' + pet.name + '</span>' +
+          '<span class="pet-buy-price"><i class="coin-dot" aria-hidden="true"></i>' + price + '</span>' +
+          '<small>' + status + '</small></button>';
+      }).join('');
+      $("run-pets").innerHTML = wallet.pets.map(function (pet, index) {
+        return '<button class="owned-pet" data-pet="' + index + '" aria-label="' + pet.name + ', ' + data.rarities[pet.rarity].name + '">' + data.art(pet) + '</button>';
+      }).join('');
+      $("collection-heading").textContent = 'Зверушки забега · ' + wallet.pets.length;
+      $("run-collection").classList.toggle('hidden', wallet.pets.length === 0);
+    }
+    function showPet(pet, fresh) {
+      var rarity = data.rarities[pet.rarity];
+      $("reward-opening").classList.add('hidden');
+      $("reward-reel").classList.add('hidden');
+      $("reward-reel").classList.remove('spinning');
+      $("reward-dialog").classList.toggle('celebrating', !!fresh && !reduced);
+      $("reward-title").textContent = pet.name;
+      $("reward-pet").innerHTML = '<div class="pet-reveal" style="--pet-color:' + rarity.color + '">' + (fresh && !reduced ? celebration() : '') + '<div class="pet-art">' + data.art(pet) + '</div></div><span class="pet-rarity" style="--pet-color:' + rarity.color + '">' + rarity.name + '</span><p class="pet-bio">' + pet.bio + '</p><div class="pet-lesson"><strong>' + pet.skill + '</strong><p>' + pet.tip + '</p></div>';
+      $("reward-pet").classList.remove('hidden');
+      $("btn-reward-done").classList.remove('hidden');
+      $("btn-reward-done").focus();
+    }
+    function reveal() {
+      var pet = wallet.reveal();
+      if (pet) { selected = pet; render(); showPet(pet, true); }
+    }
+    function close() {
+      if (wallet.pending) return;
+      resetAnimation();
+      $("reward-overlay").classList.add('hidden');
+      window.GamePlatform.block($("screen-end"), false);
+      if (returnTo) {
+        var target = returnTo === 'pet' ? $("run-pets").querySelector('button') : $("chest-list").querySelector('[data-buy="' + returnTo + '"]');
+        if (!target || target.disabled) target = $("btn-again");
+        target.focus();
+      }
+    }
+    function showOverlay() {
+      $("reward-overlay").classList.remove('hidden');
+      window.GamePlatform.block($("screen-end"), true);
+      $("reward-dialog").focus();
+    }
+    $("chest-list").addEventListener('click', function (event) {
+      var button = event.target.closest('[data-buy]');
+      if (!active || !button || button.disabled) return;
+      var purchase = wallet.buy(button.dataset.buy);
+      if (!purchase) return;
+      returnTo = button.dataset.buy; selected = null; resetAnimation(); render();
+      showOverlay();
+      // Детерминированно и сразу: показываем ровно выбранного персонажа (без прокрутки).
+      reveal();
+    });
+    $("run-pets").addEventListener('click', function (event) {
+      var button = event.target.closest('[data-pet]');
+      if (!active || !button || wallet.pending) return;
+      selected = wallet.pets[Number(button.dataset.pet)];
+      if (!selected) return;
+      returnTo = 'pet'; showOverlay(); showPet(selected);
+    });
+    $("btn-reward-done").addEventListener('click', close);
+    $("reward-overlay").addEventListener('keydown', function (event) {
+      if (event.key === 'Escape' && !wallet.pending) { event.preventDefault(); close(); }
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        (wallet.pending ? $("reward-dialog") : $("btn-reward-done")).focus();
+      }
+    });
+    return {
+      start: function (coins) { active = true; wallet.begin(coins); resetAnimation(); selected = null; $("screen-end").scrollTop = 0; render(); },
+      reset: function () { active = false; wallet.begin(0); resetAnimation(); selected = null; returnTo = null; close(); render(); },
+      update: function () { /* Покупка мгновенная — покадровая анимация не нужна. */ },
+      isOpen: function () { return !$("reward-overlay").classList.contains('hidden'); }
+    };
+  }
+  window.RewardShop = { create: create };
+})();
+
+</script>
+  <script>
+/* «Не попадись!» — игровая логика. Чистый JS + Canvas 2D. Без внешних зависимостей. */
+(function () {
+  "use strict";
+
+  // ---------- Мост с приложением (postMessage) ----------
+  var Bridge = {
+    completedSent: false,
+    send: function (type, payload) {
+      var msg = { type: type, params: payload || {} };
+      try { window.postMessage(msg, "*"); } catch (e) {}
+    },
+    vibrate: function (ms) { this.send("VIBRATION_EVENT", { duration: ms || 30 }); },
+    finish: function (data) { this.send("FINISH_EVENT", data); },
+    completed: function (data) { if (!this.completedSent) { this.completedSent = true; this.send("COMPLETED_EVENT", data); } },
+    share: function (data) { this.send("SHARING_EVENT", data); },
+    close: function () { this.send("CLOSE_EVENT", {}); }
+  };
+
+  // ---------- Звук (WebAudio, по умолчанию выключен) ----------
+  var Sound = {
+    ctx: null, on: false,
+    ensure: function () { if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } },
+    blip: function (freq, dur, type) {
+      if (!this.on || !this.ctx || paused || document.hidden) return;
+      var t = this.ctx.currentTime;
+      var o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = type || "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.18, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.12));
+      o.connect(g); g.connect(this.ctx.destination);
+      o.start(t); o.stop(t + (dur || 0.12) + 0.02);
+    },
+    good: function () { this.blip(660, 0.1, "sine"); var s = this; setTimeout(function () { s.blip(880, 0.1, "sine"); }, 70); },
+    bad: function () { this.blip(180, 0.22, "square"); },
+    coin: function () { this.blip(990, 0.08, "triangle"); },
+    combo: function () { var s = this; [660, 880, 1100, 1320].forEach(function (f, i) { setTimeout(function () { s.blip(f, 0.12, "triangle"); }, i * 70); }); },
+    swish: function () { this.blip(420, 0.05, "sine"); }
+  };
+
+  // ---------- Утилиты ----------
+  function $(id) { return document.getElementById(id); }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
+  function easeOutBack(t) { var c = 1.9; t = t - 1; return 1 + (c + 1) * t * t * t + c * t * t; }
+
+  // ---------- Состояние ----------
+  var cv = $("game"), ctx = cv.getContext("2d");
+  var eventView = window.GameEvents.create($("event-stage"));
+  var DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  var W = 0, H = 0;               // логические размеры (CSS px)
+  var LANES = 3;
+  var content = null, diff = null;
+  var actionLaneById = {}, actionById = {};        // id действия -> индекс дорожки
+
+  var state = "loading";          // loading | start | run | end
+  var paused = false, tutorialOpen = false;
+  var player = { lane: 1, x: 0, targetX: 0, bob: 0 };
+  var cards = [];
+  var RUN_SECONDS = 4 * 60;
+  var runTime = 0; // Активное реальное время, независимо от шага физики.
+  var speed = 0, elapsed = 0, roadScroll = 0;
+  var course = window.RunnerCourse.create();
+  var phase = "road", round = 0, obstaclesCleared = 0, obstacleHits = 0;
+  var cityCheer = 0, roadCoins = 0, roadObjects = [];
+  var meters = 0, coins = 0, combo = 0, bestCombo = 0, lives = 3;
+  var trapsTotal = 0, trapsOK = 0, decisionsTotal = 0, decisionsOK = 0;
+  var misses = [];                // ошибочные решения для разбора на финише
+  var lastSituation = null;
+  var answerCounts = {};   // сколько раз показан каждый тип действия — для балансировки спавна
+  var flashTimer = 0;
+  var ending = false, endTimer = 0;
+  var attractT = 1, tAnim = 0;
+
+  // «Сочность»
+  var REDUCED = false;
+  try { REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+  var rewardShop = window.RewardShop.create(REDUCED);
+  var shakeT = 0, shakeMag = 0;
+  var vignetteT = 0;              // красная вспышка по краям при ошибке
+  var squashT = 0;                // деформация героя
+  var hopT = 0, hurtT = 0;        // прыжок радости / «ой»
+  var STUMBLE_TIME = .88, stumbleT = 0, stumbleDir = 1, shieldLossT = 0;
+  var feverGlow = 0;              // плавная подсветка серии
+  var laneFlash = [0, 0, 0];      // вспышка дорожки при решении
+  var laneHint = [0, 0, 0];       // подсказка «верная дорожка» после ошибки
+  var LANE_COLORS = ["#ff4d6d", "#7350ff", "#22c37a"]; // отказать / проверить / можно
+  var LANE_RGB = ["255,77,109", "115,80,255", "34,195,122"];
+  var EVENT_SYMBOLS = { call: "📞", chat: "💬", account: "🔐", card: "💳", gift: "🎁", transfer: "↔", browser: "✉", notification: "🔔", coin: "🪙", purchase: "🏷️" };
+  var FONT = "-apple-system, system-ui, 'Segoe UI', Roboto, sans-serif";
+
+  // ---------- Геометрия псевдо-перспективы ----------
+  // Глубина p: 0 — горизонт, 1 — линия решения (позиция героя). Масштаб r(p) = 1 / (1 + (1-p)K).
+  var RT = 0.14;                  // масштаб дороги на горизонте
+  var KP = 1 / RT - 1;
+  var hy = 0, y0 = 0, pY = 0, rB = 1;
+  var roadWidth = 0, roadLeft = 0, roadRight = 0, laneWidth = 0;
+  var skyGrad, groundGrad, roadGrad;
+  var glowSun, glowGold, glowGreen;
+  var townFar, townNear, cloudImg, clouds = [];
+  var streakAng = [];
+  for (var sa = 0; sa < 12; sa++) streakAng.push(0.12 * Math.PI + (sa / 11) * 0.76 * Math.PI);
+
+  function laneX(i) { return roadLeft + laneWidth * (i + 0.5); }
+  function playerY() { return pY; }
+  function rOf(p) { return 1 / Math.max(0.22, 1 + (1 - p) * KP); }
+  function yOf(r) { return y0 + (pY - y0) * r; }
+
+  function makeGlow(rgb, size) {
+    var c = document.createElement("canvas"); c.width = c.height = size;
+    var g = c.getContext("2d"), rg = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    rg.addColorStop(0, "rgba(" + rgb + ",0.95)"); rg.addColorStop(0.35, "rgba(" + rgb + ",0.35)"); rg.addColorStop(1, "rgba(" + rgb + ",0)");
+    g.fillStyle = rg; g.fillRect(0, 0, size, size);
+    return c;
+  }
+
+  function makeTown(w, h, seed, blur, scale) {
+    var c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w * DPR)); c.height = Math.max(1, Math.round(h * DPR));
+    var g = c.getContext("2d"); g.scale(DPR, DPR);
+    var s = seed;
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
+    var WALLS = ["#ffffff", "#fff3d6", "#e8f0ff", "#ffe3ea", "#e6fff2"];
+    var ROOFS = ["#ff7a92", "#7350ff", "#ffb020", "#22c37a", "#5aa9ff"];
+    var x = -6;
+    while (x < w) {
+      if (rnd() < 0.3) {
+        // дерево-шарик
+        var tr = (9 + rnd() * 7) * scale, tx = x + tr;
+        g.fillStyle = "#b07a4f"; g.fillRect(tx - 2 * scale, h - 10 * scale, 4 * scale, 10 * scale);
+        var tg = g.createRadialGradient(tx - tr * 0.35, h - 10 * scale - tr * 1.3, 1, tx, h - 10 * scale - tr, tr * 1.1);
+        tg.addColorStop(0, "#9ef07f"); tg.addColorStop(1, "#45b13c");
+        g.fillStyle = tg; g.beginPath(); g.arc(tx, h - 10 * scale - tr, tr, 0, 6.2832); g.fill();
+        x += tr * 2 + 3;
+        continue;
+      }
+      var bw = (22 + rnd() * 26) * scale, bh = (18 + rnd() * 26) * scale, roofH = (8 + rnd() * 10) * scale;
+      var wall = WALLS[(rnd() * WALLS.length) | 0], roof = ROOFS[(rnd() * ROOFS.length) | 0];
+      // стена + боковая тень
+      g.fillStyle = wall; g.fillRect(x, h - bh, bw, bh);
+      g.fillStyle = "rgba(35,36,106,0.08)"; g.fillRect(x + bw * 0.72, h - bh, bw * 0.28, bh);
+      // крыша
+      g.fillStyle = roof; g.beginPath(); g.moveTo(x - 3, h - bh); g.lineTo(x + bw / 2, h - bh - roofH); g.lineTo(x + bw + 3, h - bh); g.closePath(); g.fill();
+      // окна
+      g.fillStyle = "#9fd3ff";
+      for (var wy = h - bh + 5 * scale; wy < h - 9 * scale; wy += 10 * scale)
+        for (var wx = x + 4 * scale; wx < x + bw - 7 * scale; wx += 9 * scale) g.fillRect(wx, wy, 4.5 * scale, 5 * scale);
+      x += bw + 2 + rnd() * 6;
+    }
+    if (!blur) return c;
+    // tilt-shift: копия с размытием (если ctx.filter не поддерживается — остаётся чёткой)
+    var b = document.createElement("canvas"); b.width = c.width; b.height = c.height;
+    var bg = b.getContext("2d");
+    try { bg.filter = "blur(" + Math.round(blur * DPR) + "px)"; } catch (e) {}
+    bg.drawImage(c, 0, 0);
+    return b;
+  }
+
+  function makeCloud() {
+    var c = document.createElement("canvas"), w = 150, h = 60;
+    c.width = w * DPR; c.height = h * DPR;
+    var g = c.getContext("2d"); g.scale(DPR, DPR);
+    g.fillStyle = "rgba(160,190,235,0.35)";
+    g.beginPath(); g.ellipse(76, 48, 66, 9, 0, 0, 6.2832); g.fill();
+    g.fillStyle = "#ffffff";
+    [[34, 38, 20], [62, 28, 26], [94, 32, 22], [118, 40, 16], [76, 42, 28]].forEach(function (b) { g.beginPath(); g.arc(b[0], b[1], b[2], 0, 6.2832); g.fill(); });
+    g.fillRect(30, 38, 92, 16);
+    return c;
+  }
+
+  // ---------- Размеры ----------
+  function resize() {
+    var app = $("app");
+    W = app.clientWidth; H = app.clientHeight;
+    // Фолбэк: в скрытой вкладке / 0-размерном контейнере не даём нулевые размеры,
+    // иначе offscreen-canvas получается 0×0 и drawImage падает (краш инициализации).
+    if (W < 50) W = window.innerWidth || 360;
+    if (H < 50) H = window.innerHeight || 640;
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    cv.style.width = W + "px"; cv.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    layout();
+    // Прогресс событий хранится во времени, поэтому поворот/resize не меняет ответ.
+    player.x = laneX(player.lane); player.targetX = player.x;
+  }
+
+  function layout() {
+    pY = Math.min(H * 0.80, H - 145); hy = H * 0.33;
+    roadWidth = W * 0.72; laneWidth = roadWidth / LANES;
+    roadLeft = (W - roadWidth) / 2; roadRight = roadLeft + roadWidth;
+    y0 = (hy - RT * pY) / (1 - RT);
+    rB = (H - y0) / (pY - y0);
+    skyGrad = ctx.createLinearGradient(0, 0, 0, hy);
+    skyGrad.addColorStop(0, "#6ec1ff"); skyGrad.addColorStop(0.6, "#a9dcff"); skyGrad.addColorStop(1, "#e4f5ff");
+    groundGrad = ctx.createLinearGradient(0, hy, 0, H);
+    groundGrad.addColorStop(0, "#a6eb8c"); groundGrad.addColorStop(1, "#5cc24a");
+    roadGrad = ctx.createLinearGradient(0, hy, 0, H);
+    roadGrad.addColorStop(0, "#eef2ff"); roadGrad.addColorStop(1, "#ffffff");
+    glowSun = makeGlow("255,248,214", 128); glowGold = makeGlow("255,210,63", 64); glowGreen = makeGlow("34,195,122", 96);
+    townFar = makeTown(W * 1.3, hy * 0.42, 7, 1.6, 0.7);
+    townNear = makeTown(W * 1.3, hy * 0.36, 29, 0.8, 0.95);
+    cloudImg = makeCloud();
+    clouds = [];
+    var s = 11;
+    for (var i = 0; i < 5; i++) {
+      s = (s * 16807) % 2147483647; var a = s / 2147483647; s = (s * 16807) % 2147483647; var b = s / 2147483647;
+      clouds.push({ x: a * W * 1.2 - W * 0.1, y: 8 + b * hy * 0.45, k: 0.45 + b * 0.5, v: 4 + a * 6 });
+    }
+  }
+
+  // ---------- Загрузка контента ----------
+  function loadContent() {
+    // Full catalog is a local script: file://, localhost and WebView use the same data.
+    content = window.GAME_CONTENT;
+    if (!content || !content.difficulty || !content.actions || !content.situations || !content.situations.length) {
+      $("screen-loading").innerHTML = '<p>Не удалось открыть игру. Распакуй всю папку game или открой play.html.</p>';
+      return false;
+    }
+    diff = content.difficulty;
+    content.actions.forEach(function (a) { actionLaneById[a.id] = a.lane; actionById[a.id] = a; });
+    showScreen("start");
+    return true;
+  }
+
+  // ---------- Экраны ----------
+  function showScreen(s) {
+    state = s;
+    if (s !== "run") eventView.hide();
+    $("screen-loading").classList.toggle("hidden", s !== "loading");
+    $("screen-start").classList.toggle("hidden", s !== "start");
+    $("screen-end").classList.toggle("hidden", s !== "end");
+    $("hud").classList.toggle("hidden", s !== "run");
+    syncPhaseUI();
+    if (s !== "run") { $("flash").classList.add("hidden"); }
+  }
+
+  function setTutorial(open) {
+    tutorialOpen = open;
+    $("tutorial-overlay").classList.toggle("hidden", !open);
+    window.GamePlatform.block($("screen-start"), open);
+    window.GamePlatform.block(cv, open);
+    if (open) $("btn-tutorial-start").focus();
+  }
+  function openTutorial() {
+    if (state !== "start" || tutorialOpen) return;
+    setTutorial(true);
+  }
+  function finishTutorial() {
+    if (!tutorialOpen) return;
+    if (Sound.on) Sound.ensure();
+    startRun(); cv.focus();
+  }
+
+  function setPaused(value, restoreFocus) {
+    if (value && state !== "run") return;
+    paused = !!value;
+    last = 0; // Не включать время паузы в следующий кадр таймера.
+    $("pause-overlay").classList.toggle("hidden", !paused);
+    $("app").classList.toggle("is-paused", paused);
+    ["hud", "event-stage", "lane-legend"].forEach(function (id) { window.GamePlatform.block($(id), paused); });
+    if (Sound.ctx) {
+      var pending = paused ? Sound.ctx.suspend() : Sound.ctx.resume();
+      if (pending && pending.catch) pending.catch(function () {});
+    }
+    if (paused) $("btn-resume").focus();
+    else if (restoreFocus && state === "run") $("btn-pause").focus();
+  }
+  function exitGame() {
+    setPaused(false); eventView.hide(); rewardShop.reset();
+    clearFx(); cards = []; counters = []; coins = 0; course.jumpHeight = 0;
+    ending = false; showScreen("start"); $("btn-play").focus(); Bridge.close();
+  }
+
+  // ---------- Старт забега ----------
+  function startRun() {
+    setTutorial(false);
+    setPaused(false); rewardShop.reset(); counters = [];
+    eventView.hide();
+    player.lane = 1; player.x = laneX(1); player.targetX = player.x; player.bob = 0;
+    cards = []; speed = diff.startSpeed; elapsed = 0; runTime = 0;
+    $("run-complete").classList.add("hidden");
+    phase = "road"; round = 0; obstaclesCleared = 0; obstacleHits = 0; roadCoins = 0; cityCheer = 0; roadScroll = 0;
+    course.begin(round, diff.runSeconds || 10, diff.runSpeedMultiplier || 1.5);
+    meters = 0; coins = 0; combo = 0; bestCombo = 0; lives = diff.lives;
+    trapsTotal = 0; trapsOK = 0; decisionsTotal = 0; decisionsOK = 0;
+    misses = [];
+    lastSituation = null; answerCounts = {}; flashTimer = 0; ending = false; endTimer = 0;
+    clearFx(); shakeT = 0; vignetteT = 0; squashT = 0; hopT = 0; hurtT = 0; feverGlow = 0;
+    laneFlash[0] = laneFlash[1] = laneFlash[2] = 0; laneHint[0] = laneHint[1] = laneHint[2] = 0;
+    lastDist = -1; lastCoins = -1;
+    renderLives(-1);
+    updateCombo(false);
+    syncLegend();
+    showScreen("run");
+    addFloat(W / 2, H * 0.42, "Поехали!", "#ffffff", 30);
+    Sound.swish();
+  }
+
+  function lifeIcon(className) {
+    return '<svg class="' + className + '" viewBox="0 0 28 32" aria-hidden="true"><path d="M14 2L25 6V16Q24 25 14 30Q4 25 3 16V6Z" fill="#22c37a" stroke="#5432e6" stroke-width="2.2" stroke-linejoin="round"/><path d="M8 15l4 4 8-9" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+  function renderLives(lostIdx) {
+    var el = $("lives"), s = "";
+    for (var i = 0; i < diff.lives; i++) {
+      s += '<span aria-hidden="true" class="life' + (i >= lives ? " lost" : "") + (i === lostIdx ? " pop" : "") + '">' + lifeIcon("life-icon");
+      if (i === lostIdx && !REDUCED) {
+        for (var part = 0; part < 4; part++) s += lifeIcon("life-shard shard-" + part);
+      }
+      s += '</span>';
+    }
+    el.innerHTML = s + '<span class="sr-only">Щиты: ' + lives + ' из ' + diff.lives + '</span>';
+    el.classList.remove("hit");
+    if (lostIdx >= 0) { shieldLossT = 1.15; void el.offsetWidth; el.classList.add("hit"); }
+  }
+
+  // ---------- Спавн ситуаций ----------
+  function decisionSeconds() {
+    // Шесть секунд чтения и выбора при любой дистанции и скорости бега.
+    // Чтобы это окно было комфортным для 6–7 лет, дорога в фазе решения сильно
+    // замедляется (см. update): ребёнок читает спокойно, а не на полной скорости.
+    return (diff && diff.eventReadSeconds) || 6;
+  }
+  function spawnSituation() {
+    // Последнее сообщение тоже получает полные шесть секунд до финиша.
+    if (RUN_SECONDS - runTime < decisionSeconds() + .1) return;
+    // Монетка из прежнего каталога теперь собирается на дороге и не требует решения.
+    var situations = content.situations.filter(function (s) { return s.delivery !== "pickup"; });
+    // Балансируем по трём действиям: показываем самое редкое на данный момент, чтобы
+    // ребёнок анализировал ситуацию, а не угадывал по частоте (в каталоге перекос в «Отказать»).
+    var ids = (content.actions || []).map(function (a) { return a.id; })
+      .filter(function (id) { return situations.some(function (x) { return x.answer === id; }); });
+    var minCount = Math.min.apply(null, ids.map(function (id) { return answerCounts[id] || 0; }));
+    var leastShown = ids.filter(function (id) { return (answerCounts[id] || 0) === minCount; });
+    var targetAnswer = leastShown[(Math.random() * leastShown.length) | 0];
+    var pool = situations.filter(function (x) { return x.answer === targetAnswer; });
+    var s = pick(pool);
+    var guard = 0;
+    while (s === lastSituation && pool.length > 1 && guard++ < 6) s = pick(pool);
+    answerCounts[targetAnswer] = (answerCounts[targetAnswer] || 0) + 1;
+    lastSituation = s;
+    var lane = actionLaneById[s.answer];
+    var duration = decisionSeconds();
+    cards.push({
+      icon: s.icon, text: s.text, why: s.why, answer: s.answer, visual: s.visual,
+      answerLane: lane, isTrap: s.answer !== "ok",
+      x: laneX(player.lane), y: -cardH(), resolved: false, result: null, flashT: 0, removeTimer: 0, age: 0, duration: duration, presented: false
+    });
+    phase = "decision"; syncPhaseUI();
+    eventView.show(s); eventView.update(0, duration);
+  }
+  function cardH() { return 108; }
+
+  // ---------- Ввод ----------
+  function move(dir) {
+    if (state !== "run" || paused || ending) return;
+    var prev = player.lane;
+    player.lane = clamp(player.lane + dir, 0, LANES - 1);
+    player.targetX = laneX(player.lane);
+    if (player.lane !== prev) { squashT = 0.2; spawnDust(); syncLegend(); Sound.swish(); }
+  }
+  function syncLegend() {
+    var items = document.querySelectorAll("#lane-legend .legend-item");
+    for (var i = 0; i < items.length; i++) items[i].classList.toggle("active", i === player.lane);
+  }
+  function syncPhaseUI() {
+    var running = state === "run", choosing = phase !== "road";
+    $("app").dataset.phase = phase;
+    $("lane-legend").classList.toggle("hidden", !running || !choosing || ending);
+  }
+  function beginRoad() {
+    phase = "road"; round++;
+    course.begin(round, diff.runSeconds || 10, diff.runSpeedMultiplier || 1.5);
+    syncPhaseUI();
+  }
+  function jump() {
+    if (state !== "run" || paused || phase !== "road" || ending) return;
+    if (course.jump()) { Sound.swish(); spawnDust(); }
+  }
+  function setupInput() {
+    document.addEventListener("keydown", function (e) {
+      if (tutorialOpen) {
+        if (e.key === "Escape" && !e.repeat) { e.preventDefault(); finishTutorial(); }
+        return;
+      }
+      if (state !== "run") return;
+      var key = e.key.toLowerCase();
+      if (key === "escape" || key === "p" || key === "з") { e.preventDefault(); if (!e.repeat) setPaused(!paused, true); return; }
+      if (paused) return;
+      if (["arrowleft", "arrowright", "arrowup", "a", "d", "w", " "].indexOf(key) < 0) return;
+      // Space на кнопке звука должен работать как обычная активация этой кнопки.
+      if (key === " " && (e.target.id === "sound-run" || e.target.id === "btn-pause")) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (key === "arrowleft" || key === "a") move(-1);
+      else if (key === "arrowright" || key === "d") move(1);
+      else jump();
+    });
+    var sx = 0, sy = 0, pointer = null;
+    cv.addEventListener("pointerdown", function (e) {
+      if (pointer !== null || !e.isPrimary || e.button !== 0) return;
+      sx = e.clientX; sy = e.clientY; pointer = e.pointerId;
+      try { if (cv.setPointerCapture) cv.setPointerCapture(e.pointerId); } catch (ignored) {}
+    });
+    cv.addEventListener("pointerup", function (e) {
+      if (pointer !== e.pointerId) return;
+      pointer = null;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (dy < -24 && Math.abs(dy) > Math.abs(dx)) jump();
+      else if (Math.abs(dx) > 24 && Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 1 : -1);
+      else if (Math.abs(dx) < 16 && Math.abs(dy) < 16) move(e.clientX - cv.getBoundingClientRect().left < W / 2 ? -1 : 1);
+    });
+    cv.addEventListener("pointercancel", function () { pointer = null; });
+    document.querySelectorAll("#lane-legend .legend-item").forEach(function (el) {
+      el.addEventListener("click", function () { move(Number(el.dataset.lane) - player.lane); });
+    });
+  }
+
+  // ---------- Пулы эффектов (без аллокаций в кадре) ----------
+  var PMAX = 220, particles = [], rings = [], floats = [], coinFlights = [];
+  var i0;
+  for (i0 = 0; i0 < PMAX; i0++) particles.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 3, color: "#fff", grav: 0, shape: 0, rot: 0, vr: 0 });
+  for (i0 = 0; i0 < 6; i0++) rings.push({ x: 0, y: 0, life: 0, max: 1, r0: 10, r1: 60, color: "255,255,255" });
+  for (i0 = 0; i0 < 6; i0++) floats.push({ x: 0, y: 0, life: 0, max: 1, text: "", color: "#fff", size: 20, vy: -50 });
+  for (i0 = 0; i0 < 12; i0++) coinFlights.push({ life: 0, max: .68, x: 0, y: 0, cx: 0, cy: 0, tx: 0, ty: 0, scale: 1, value: 1 });
+  var pCursor = 0, rCursor = 0, fCursor = 0;
+
+  function clearFx() {
+    for (var i = 0; i < PMAX; i++) particles[i].life = 0;
+    for (i = 0; i < rings.length; i++) rings[i].life = 0;
+    for (i = 0; i < floats.length; i++) floats[i].life = 0;
+    for (i = 0; i < coinFlights.length; i++) coinFlights[i].life = 0;
+    $("coins").classList.remove("pop");
+    stumbleT = 0; shieldLossT = 0; $("lives").classList.remove("hit");
+  }
+  function pulseCoinCounter() {
+    var badge = $("coins");
+    badge.classList.remove("pop"); void badge.offsetWidth; badge.classList.add("pop");
+  }
+  function collectCoin(c) {
+    if (REDUCED) return;
+    var pos = coinPosition(c), r = pos.scale, x = pos.x, y = pos.y;
+    if (c.value === 5) addFloat(x, y - 28, "+5", "#945916", 24);
+    addRing(x, y, 8, 34, "255,205,63", .28);
+    for (var n = 0; n < 5; n++) {
+      var a = n * Math.PI * 2 / 5;
+      addParticle(x, y, Math.cos(a) * 65, Math.sin(a) * 65 - 25, .28, 3, "#ffd23f", 0);
+    }
+    for (var i = 0; i < coinFlights.length; i++) {
+      var f = coinFlights[i]; if (f.life > 0) continue;
+      // DOM geometry is read once at pickup, never during a frame's rendering.
+      var target = $("coin-target").getBoundingClientRect(), field = cv.getBoundingClientRect();
+      f.x = x; f.y = y; f.scale = r; f.value = c.value || 1;
+      f.tx = (target.left + target.width / 2 - field.left) * W / field.width;
+      f.ty = (target.top + target.height / 2 - field.top) * H / field.height;
+      f.cx = clamp(x + (x < W / 2 ? 55 : -55), 24, W - 24); f.cy = y - 135;
+      f.life = f.max;
+      break;
+    }
+  }
+  function drawCoinFlights() {
+    for (var i = 0; i < coinFlights.length; i++) {
+      var f = coinFlights[i]; if (f.life <= 0) continue;
+      var age = 1 - f.life / f.max;
+      // A short pickup pop, then an accelerating arc into the coin counter.
+      var t = clamp((age - .12) / .88, 0, 1); t *= t;
+      var u = 1 - t, x = u*u*f.x + 2*u*t*f.cx + t*t*f.tx, y = u*u*f.y + 2*u*t*f.cy + t*t*f.ty;
+      var scale = lerp(f.scale, .46, t) * (1 + .22 * Math.sin(Math.min(1, age / .24) * Math.PI));
+      ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale);
+      ctx.globalAlpha = .45; ctx.drawImage(glowGold, -31, -31, 62, 62); ctx.globalAlpha = 1;
+      ctx.rotate(Math.sin(age * Math.PI) * .3);
+      drawCoinFace(.85 + .15 * Math.cos(age * 10), f.value);
+      ctx.restore();
+    }
+  }
+  function addParticle(x, y, vx, vy, life, size, color, grav, shape) {
+    var p = null, i;
+    for (i = 0; i < PMAX; i++) { var q = particles[(pCursor + i) % PMAX]; if (q.life <= 0) { p = q; pCursor = (pCursor + i + 1) % PMAX; break; } }
+    if (!p) return;
+    p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.life = life; p.max = life; p.size = size; p.color = color; p.grav = grav || 0;
+    p.shape = shape || 0; p.rot = Math.random() * 6; p.vr = (Math.random() - 0.5) * 14;
+  }
+  function addRing(x, y, r0, r1, rgb, life) {
+    var r = rings[rCursor]; rCursor = (rCursor + 1) % rings.length;
+    r.x = x; r.y = y; r.r0 = r0; r.r1 = r1; r.color = rgb; r.life = life; r.max = life;
+  }
+  function addFloat(x, y, text, color, size) {
+    var f = floats[fCursor]; fCursor = (fCursor + 1) % floats.length;
+    f.x = x; f.y = y; f.text = text; f.color = color; f.size = size; f.life = 0.9; f.max = 0.9; f.vy = -60;
+  }
+  function spawnBurst(x, y, color) {
+    if (REDUCED) { addParticle(x, y, 0, -40, 0.4, 6, color, 0); return; }
+    var n = 14;
+    for (var i = 0; i < n; i++) {
+      var a = (Math.PI * 2 * i) / n + Math.random() * 0.4, s = 120 + Math.random() * 160;
+      addParticle(x, y, Math.cos(a) * s, Math.sin(a) * s - 60, 0.5 + Math.random() * 0.3, 4 + Math.random() * 4, color, 420);
+    }
+  }
+  function spawnCoins(x, y) {
+    if (REDUCED) return;
+    for (var i = 0; i < 6; i++) {
+      addParticle(x + (Math.random() - 0.5) * 30, y, (Math.random() - 0.5) * 120, -220 - Math.random() * 120, 0.65, 7, "#ffc24b", 650);
+    }
+  }
+  var CONFETTI = ["#21a038", "#00c1a0", "#ffc24b", "#3e9bff", "#ff5a5f", "#ffffff"];
+  function spawnConfetti(x, y, n, up) {
+    if (REDUCED) return;
+    for (var i = 0; i < n; i++) {
+      var a = up ? -Math.PI / 2 + (Math.random() - 0.5) * 2.2 : Math.PI / 2 + (Math.random() - 0.5) * 0.6;
+      var s = up ? 220 + Math.random() * 300 : 60 + Math.random() * 120;
+      addParticle(x + (up ? 0 : (Math.random() - 0.5) * W), y, Math.cos(a) * s, Math.sin(a) * s, 1.1 + Math.random() * (up ? 0.6 : 1.4), 5 + Math.random() * 3, CONFETTI[i % CONFETTI.length], up ? 520 : 140, 1);
+    }
+  }
+  function spawnDust() {
+    if (REDUCED) return;
+    var y = playerY() + 34;
+    for (var i = 0; i < 5; i++) addParticle(player.x, y, (Math.random() - 0.5) * 90, -Math.random() * 40, 0.35, 3 + Math.random() * 3, "rgba(255,255,255,0.5)", 120);
+  }
+  function updateFx(dt) {
+    var i, p;
+    for (i = 0; i < PMAX; i++) {
+      p = particles[i];
+      if (p.life <= 0) continue;
+      p.life -= dt;
+      p.vy += p.grav * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+    }
+    for (i = 0; i < rings.length; i++) if (rings[i].life > 0) rings[i].life -= dt;
+    for (i = 0; i < floats.length; i++) { var f = floats[i]; if (f.life > 0) { f.life -= dt; f.y += f.vy * dt; } }
+    for (i = 0; i < coinFlights.length; i++) {
+      var coin = coinFlights[i]; if (coin.life <= 0) continue;
+      coin.life = Math.max(0, coin.life - dt);
+      if (coin.life === 0 && state === "run") pulseCoinCounter();
+    }
+  }
+  function drawFx() {
+    var i, p, a;
+    for (i = 0; i < PMAX; i++) {
+      p = particles[i];
+      if (p.life <= 0) continue;
+      a = p.life / p.max; if (a > 1) a = 1;
+      ctx.globalAlpha = a; ctx.fillStyle = p.color;
+      if (p.shape === 1) {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillRect(-p.size * 0.5, -p.size * 0.3, p.size, p.size * 0.6); ctx.restore();
+      } else { ctx.beginPath(); ctx.arc(p.x, p.y, p.size * a + 1, 0, 6.2832); ctx.fill(); }
+    }
+    ctx.globalAlpha = 1;
+    for (i = 0; i < rings.length; i++) {
+      var r = rings[i]; if (r.life <= 0) continue;
+      var t = 1 - r.life / r.max;
+      ctx.strokeStyle = "rgba(" + r.color + "," + (1 - t) * 0.8 + ")"; ctx.lineWidth = 4 * (1 - t) + 1;
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, lerp(r.r0, r.r1, t), lerp(r.r0, r.r1, t) * 0.55, 0, 0, 6.2832); ctx.stroke();
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (i = 0; i < floats.length; i++) {
+      var f = floats[i]; if (f.life <= 0) continue;
+      var k = 1 - f.life / f.max, sc = k < 0.15 ? easeOutBack(k / 0.15) : 1;
+      ctx.globalAlpha = f.life / f.max > 0.35 ? 1 : f.life / f.max / 0.35;
+      ctx.font = "900 " + Math.round(f.size * sc) + "px " + FONT;
+      ctx.lineWidth = 5; ctx.strokeStyle = "rgba(8,18,28,0.75)"; ctx.lineJoin = "round";
+      ctx.strokeText(f.text, f.x, f.y); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+  function shake(mag) { if (REDUCED) return; shakeT = 0.3; shakeMag = mag; }
+
+  // ---------- Разрешение карточки ----------
+  var PRAISE = { refuse: ["Отказ!", "Не дался!", "Стоп!"], check: ["Проверил!", "Умно!", "Сверил!"], ok: ["Верно!", "Можно!", "Точно!"] };
+  function resolveCard(c) {
+    c.resolved = true;
+    phase = "feedback"; syncPhaseUI();
+    decisionsTotal++;
+    if (c.isTrap) trapsTotal++;
+    var correct = player.lane === c.answerLane;
+    eventView.resolve(correct);
+    c.result = correct ? "ok" : "bad";
+    c.flashT = 0.5;
+    c.removeTimer = 0.5;
+    var hy2 = playerY();
+    if (correct) {
+      decisionsOK++;
+      if (c.isTrap) trapsOK++;
+      combo++; bestCombo = Math.max(bestCombo, combo);
+      var gain = 1 + Math.floor(combo / 3);
+      coins += gain;
+      Bridge.vibrate(25); Sound.good();
+      spawnBurst(player.x, hy2, LANE_COLORS[c.answerLane]);
+      spawnBurst(player.x, hy2 - 10, "#ffffff");
+      spawnCoins(player.x, hy2);
+      addRing(player.x, hy2 + 30, 14, 90, LANE_RGB[c.answerLane], 0.5);
+      laneFlash[c.answerLane] = 0.5;
+      addFloat(player.x, hy2 - 62, pick(PRAISE[c.answer] || PRAISE.ok), "#ffffff", 22);
+      addFloat(player.x + 34, hy2 - 30, "+" + gain, "#ffc24b", 20);
+      // Явный тост исхода + celebration на каждый верный ответ (виральность)
+      addFloat(W / 2, H * 0.30, "Верно!", "#1e9e5a", 34);
+      spawnConfetti(player.x, hy2 - 10, 14, true);
+      addRing(player.x, hy2 + 30, 16, 120, LANE_RGB[c.answerLane], 0.55);
+      squashT = 0.16; hopT = 0.36;
+      if (combo === 3 || (combo > 3 && combo % 4 === 0)) {
+        spawnConfetti(player.x, hy2 - 10, 26, true);
+        addFloat(W / 2, H * 0.4, "Комбо x" + (1 + Math.floor(combo / 3)) + "!", "#ffc24b", 36);
+        addRing(player.x, hy2 + 30, 20, 190, "255,194,75", 0.65);
+        Sound.combo();
+      }
+      updateCombo(true);
+    } else {
+      var hadCombo = combo > 0;
+      misses.push({ icon: c.icon, text: c.text, why: c.why, answer: c.answer, isTrap: c.isTrap });
+      combo = 0; updateCombo(false);
+      lives--; renderLives(lives);
+      Bridge.vibrate(70); Sound.bad();
+      shake(10); vignetteT = 0.5; squashT = 0.22; hurtT = 0.55;
+      laneHint[c.answerLane] = 1.6;
+      spawnBurst(player.x, hy2 - 30, "#ff5a5f"); spawnBurst(player.x, hy2, "#ff8a8e");
+      addFloat(player.x, hy2 - 62, hadCombo ? "Серия прервана" : "Ой!", "#ff8a8e", 22);
+      // Явный тост исхода: честно отличаем ловушку от «зря отказался от безопасного»
+      addFloat(W / 2, H * 0.30, c.isTrap ? "Ой, ловушка!" : "Это было безопасно", "#ff4d6d", 30);
+      showFlash(c);
+      eventView.hide();
+      if (lives <= 0) { ending = true; endTimer = Math.max(2, flashTimer); syncPhaseUI(); }
+    }
+  }
+
+  function updateCourse(dt) {
+    var events = course.update(dt, (player.x - roadLeft) / laneWidth - 0.5, 21 / laneWidth);
+    for (var i = 0; i < events.length; i++) {
+      var e = events[i];
+      if (e.type === "land") { squashT = 0.17; spawnDust(); }
+      if (e.type === "clear" && !ending) {
+        obstaclesCleared++;
+        if (e.jumped) addFloat(player.x, playerY() - 70, "Прыжок!", "#ffc24b", 19);
+        if (e.jumped) addRing(player.x, playerY() + 34, 12, 55, "255,194,75", .4);
+      }
+      if (e.type === "coin" && !ending) {
+        var value = e.coin.value || 1;
+        coins += value; roadCoins += value; cityCheer = 1.5; Sound.coin();
+        collectCoin(e.coin);
+      }
+      if (e.type === "hit" && !ending) {
+        obstacleHits++; lives--; renderLives(lives); combo = 0; updateCombo(false);
+        stumbleT = REDUCED ? 0 : STUMBLE_TIME;
+        stumbleDir = player.x < laneX(e.obstacle.lane) ? -1 : 1;
+        shake(3); vignetteT = REDUCED ? 0 : .22; hurtT = STUMBLE_TIME; Bridge.vibrate(50); Sound.bad();
+        if (!REDUCED) {
+          spawnDust(); addRing(player.x, playerY() + 30, 10, 46, "255,133,162", .35);
+        }
+        if (lives <= 0) { ending = true; endTimer = 1.4; syncPhaseUI(); }
+      }
+    }
+
+    if (course.ready && !ending) spawnSituation();
+  }
+
+  function updateCombo(pop) {
+    var el = $("combo");
+    if (combo >= 2) {
+      el.textContent = "🔥 x" + (1 + Math.floor(combo / 3));
+      el.classList.remove("hidden");
+      if (pop) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+    } else el.classList.add("hidden");
+  }
+
+  function showFlash(c) {
+    var el = $("flash");
+    var a = actionById[c.answer] || {};
+    el.innerHTML = '<span class="flash-icon">' + c.icon + "</span>" + escapeHtml(c.why) +
+      '<div class="flash-ans">Верно: ' + (a.emoji || "") + " " + escapeHtml(a.label || "") + "</div>";
+    el.classList.remove("hidden");
+    el.style.animation = "none"; void el.offsetWidth; el.style.animation = "";
+    flashTimer = Math.max(3.2, c.why.split(/\s+/).length * 0.22);
+  }
+
+  // ---------- Конец забега ----------
+  var counters = [];
+  function countTo(id, to, suffix, delay) { counters.push({ el: $(id), to: to, t: -delay, suf: suffix || "" }); $(id).textContent = "0" + (suffix || ""); }
+
+  function endRun(completed) {
+    if (state !== "run") return;
+    // Победный баннер — только за настоящее освоение: добежал до конца и НИ РАЗУ не попался
+    // (все встреченные ситуации решены верно). Иначе — обычный финиш с честным разбором.
+    var success = completed === true && lives > 0 && runTime + 1e-9 >= RUN_SECONDS &&
+      decisionsTotal > 0 && decisionsOK === decisionsTotal;
+    $("run-complete").classList.toggle("hidden", !success);
+    $("end-title").classList.toggle("hidden", success);
+    $("screen-end").setAttribute("aria-labelledby", success ? "complete-title" : "end-title");
+    setPaused(false);
+    showScreen("end");
+    $("screen-end").scrollTop = 0;
+    cards = []; course.obstacles.length = 0; course.coins.length = 0; course.jumpHeight = 0; clearFx();
+    counters = [];
+    countTo("end-distance", Math.round(meters), "", 0.1);
+    countTo("end-coins", coins, "", 0.2);
+    $("end-recognized").textContent = trapsOK + "/" + trapsTotal;
+    var pct = decisionsTotal ? decisionsOK / decisionsTotal : 0;
+    var verdict = !decisionsTotal ? "Каждый забег — новая попытка. У тебя получится!" :
+      pct >= .9 ? "Отличная внимательность! Продолжай в том же духе." :
+      pct >= .6 ? "Хороший забег! Продолжай замечать ловушки." :
+      "С каждым забегом ты внимательнее. Попробуй ещё!";
+    $("end-verdict").textContent = verdict;
+    renderReview();
+    rewardShop.start(coins);
+
+    Bridge.finish({ meters: Math.round(meters), coins: coins, trapsOK: trapsOK, trapsTotal: trapsTotal, bestCombo: bestCombo, seconds: runTime, result: success ? "completed" : lives <= 0 ? "lost" : "stopped" });
+    if (success) Bridge.completed({ meters: Math.round(meters), trapsOK: trapsOK, trapsTotal: trapsTotal, seconds: runTime });
+  }
+
+  function escapeHtml(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+
+  // ---------- Разбор ошибок на финише («почему») ----------
+  function renderReview() {
+    var el = $("end-review");
+    if (!el) return;
+    var seen = {}, uniq = [];
+    for (var i = 0; i < misses.length; i++) { var m = misses[i]; if (seen[m.text]) continue; seen[m.text] = 1; uniq.push(m); }
+    if (!uniq.length) {
+      // Хвалим за «без ошибок» только если ребёнок реально встречал ловушки
+      el.innerHTML = decisionsTotal > 0
+        ? '<p class="review-allgood">🎉 Ни одной ошибки — ты раскусил все ловушки!</p>'
+        : '<p class="review-neutral">Ловушки ждут впереди — беги дальше и проверяй сообщения!</p>';
+      return;
+    }
+    var html = '<p class="review-title">Разбор — нажми, чтобы понять:</p>';
+    for (var r = 0; r < Math.min(5, uniq.length); r++) {
+      var u = uniq[r], act = actionById[u.answer] || {};
+      var tag = u.isTrap ? '' : '<span class="review-safe">это было безопасно</span>';
+      html += '<button class="review-item" type="button">' +
+        '<span class="ri-top">' + u.icon + ' <span class="ri-text">' + escapeHtml(u.text) + '</span>' + tag + '</span>' +
+        '<span class="ri-why">' + escapeHtml(u.why) +
+        ' <b>Верно: ' + (act.emoji || '') + ' ' + escapeHtml(act.label || '') + '</b></span>' +
+        '</button>';
+    }
+    el.innerHTML = html;
+    var items = el.querySelectorAll('.review-item');
+    for (var k = 0; k < items.length; k++) items[k].addEventListener('click', function () { this.classList.toggle('open'); });
+  }
+
+  // ---------- Обновление ----------
+  var lastDist = -1, lastCoins = -1;
+  function update(dt, decisionDt) {
+    if (paused) return;
+    rewardShop.update(dt);
+    tAnim += dt;
+    cityCheer = Math.max(0, cityCheer - dt);
+    var i;
+    // общие эффекты
+    updateFx(dt);
+    if (shakeT > 0) shakeT -= dt;
+    if (vignetteT > 0) vignetteT -= dt;
+    if (squashT > 0) squashT -= dt;
+    if (hopT > 0) hopT -= dt;
+    if (hurtT > 0) hurtT -= dt;
+    if (stumbleT > 0) stumbleT = Math.max(0, stumbleT - dt);
+    if (shieldLossT > 0) {
+      shieldLossT = Math.max(0, shieldLossT - dt);
+      if (shieldLossT === 0) renderLives(-1);
+    }
+    for (i = 0; i < 3; i++) { if (laneFlash[i] > 0) laneFlash[i] -= dt; if (laneHint[i] > 0) laneHint[i] -= dt; }
+    feverGlow = lerp(feverGlow, state === "run" && combo >= 3 ? 1 : 0, Math.min(1, dt * 5));
+    for (i = 0; i < counters.length; i++) {
+      var ct = counters[i]; ct.t += dt;
+      if (ct.t < 0) continue;
+      var k = Math.min(1, ct.t / 0.8); k = 1 - (1 - k) * (1 - k);
+      ct.el.textContent = Math.round(ct.to * k) + ct.suf;
+    }
+
+    if (state !== "run") {
+      // «витрина» на старте/финише: дорога едет, герой сам перебегает дорожки
+      roadScroll += 150 * dt;
+      player.bob += dt * 12;
+      player.x = lerp(player.x, player.targetX, Math.min(1, dt * 8));
+      attractT -= dt;
+      if (attractT <= 0 && (state === "start" || state === "end")) {
+        attractT = 1.1 + Math.random() * 0.8;
+        var nl = (player.lane + (Math.random() < 0.5 ? -1 : 1) + LANES) % LANES;
+        player.lane = nl; player.targetX = laneX(nl); squashT = 0.2;
+      }
+      return;
+    }
+
+    var remaining = RUN_SECONDS - runTime;
+    runTime = Math.min(RUN_SECONDS, runTime + Math.max(0, decisionDt === undefined ? dt : decisionDt));
+    if (runTime + 1e-9 >= RUN_SECONDS) {
+      runTime = RUN_SECONDS;
+      // Даже при задержке последнего кадра засчитать уже завершившееся окно ответа.
+      for (var finalCard = 0; finalCard < cards.length; finalCard++) {
+        var pendingCard = cards[finalCard];
+        if (!pendingCard.resolved && pendingCard.presented && pendingCard.age + remaining + 1e-9 >= pendingCard.duration) {
+          pendingCard.age = pendingCard.duration;
+          resolveCard(pendingCard);
+        }
+      }
+      endRun(!ending && lives > 0);
+      return;
+    }
+    elapsed += dt;
+    speed = Math.min(diff.maxSpeed, diff.startSpeed + elapsed * diff.speedRampPerSec) * (0.68 + 0.32 * Math.min(1, elapsed / 20)) * (diff.runSpeedMultiplier || 1.5);
+    // Пока показана карточка-ситуация, сильно замедляем дорогу — ребёнок спокойно читает
+    // и выбирает, а не гонит на полной скорости (препятствий в фазе решения и так нет).
+    if (phase !== "road") speed *= 0.3;
+    meters += speed * dt * 0.09;
+    roadScroll += speed * dt;
+    player.x = lerp(player.x, player.targetX, Math.min(1, dt * 14));
+    player.bob += dt * (11 + speed / 90);
+
+    if (phase === "road" && !ending) updateCourse(dt);
+    if (phase === "feedback" && cards.length === 0 && flashTimer <= 0 && !ending) {
+      beginRoad();
+    }
+
+    // движение карточек
+    var pYY = playerY();
+    for (var j = cards.length - 1; j >= 0; j--) {
+      var c = cards[j];
+      // Новый текст сначала рисуется целиком; прошедшее до появления время не списываем.
+      if (c.presented) c.age = Math.min(c.duration, c.age + (decisionDt === undefined ? dt : decisionDt));
+      else c.presented = true;
+      if (!c.resolved) {
+        c.y = lerp(-cardH(), pYY - cardH(), clamp(c.age / c.duration, 0, 1));
+        eventView.update(c.age / c.duration, c.duration - c.age);
+        // карточка «едет» за героем на выбранную дорожку — связь выбора и действия
+        c.x = lerp(c.x, laneX(player.lane), Math.min(1, dt * 10));
+        if (c.age + 1e-9 >= c.duration) resolveCard(c);
+      } else {
+        c.removeTimer -= dt;
+      }
+      if (c.flashT > 0) c.flashT -= dt;
+      if (c.resolved && c.removeTimer <= 0) { cards.splice(j, 1); eventView.hide(); }
+    }
+
+    if (ending) { endTimer -= dt; if (endTimer <= 0) { ending = false; endRun(); return; } }
+
+    // таймер вспышки
+    if (flashTimer > 0) { flashTimer -= dt; if (flashTimer <= 0) $("flash").classList.add("hidden"); }
+
+    // HUD (DOM трогаем только при изменении)
+    var dm = Math.round(meters);
+    if (dm !== lastDist) { lastDist = dm; $("distance").textContent = dm + " м"; }
+    if (coins !== lastCoins) {
+      $("coins-n").textContent = coins;
+      if (lastCoins >= 0 && !coinFlights.some(function (f) { return f.life > 0; })) pulseCoinCounter();
+      lastCoins = coins;
+    }
+  }
+
+  // ---------- Рендер ----------
+  var ghostX = [0, 0, 0, 0];
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (shakeT > 0) {
+      var m = shakeMag * (shakeT / 0.3);
+      ctx.translate((Math.random() - 0.5) * m, (Math.random() - 0.5) * m);
+    }
+    drawRoad();
+    window.GameCity.draw(ctx, { width: W, height: H, roadWidth: roadWidth, time: tAnim, scroll: roadScroll, cheer: cityCheer, reduced: REDUCED, perspective: KP, yOf: yOf, sxAt: sxAt });
+    roadObjects.length = 0;
+    if (state === "run" && phase === "road") {
+      Array.prototype.push.apply(roadObjects, course.obstacles);
+      Array.prototype.push.apply(roadObjects, course.coins);
+      roadObjects.sort(function (a, b) { return a.p - b.p; });
+    }
+    drawRoadObjects(false);
+    for (var i = 0; i < cards.length; i++) drawCard(cards[i]);
+    drawPlayer();
+    drawRoadObjects(true);
+    drawFx();
+    ctx.restore();
+    drawVignette();
+    drawCoinFlights();
+    drawShieldLoss();
+  }
+
+  function drawShieldLoss() {
+    if (shieldLossT <= 0 || state !== "run") return;
+    var t = 1 - shieldLossT / 1.15;
+    var x = clamp(player.x, 52, W - 52), y = playerY() - course.jumpHeight - 75 - (REDUCED ? 0 : t * 18);
+    ctx.save(); ctx.globalAlpha = t < .78 ? 1 : (1 - t) / .22;
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = "#ff85a2"; ctx.lineWidth = 2;
+    roundRect(x - 44, y - 15, 88, 30, 12); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#b32a50"; ctx.font = "900 16px " + FONT; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("−1 щит", x, y); ctx.restore();
+  }
+
+  function drawVignette() {
+    if (vignetteT <= 0) return;
+    var a = Math.min(0.55, vignetteT);
+    var g = ctx.createRadialGradient(W / 2, H / 2, H * 0.3, W / 2, H / 2, H * 0.72);
+    g.addColorStop(0, "rgba(255,70,70,0)");
+    g.addColorStop(1, "rgba(255,40,40," + a + ")");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  }
+
+  // X на экране для «нижней» координаты xb на глубине-масштабе r
+  function sxAt(xb, r) {
+    var follow = REDUCED ? 0 : (player.x - W / 2) * .075;
+    return W / 2 + (xb - W / 2) * r - follow * (1 - r);
+  }
+
+  function drawRoad() {
+    var i, j, r, y, N, ph, fl, u = roadScroll / pY;
+
+    // небо, солнце, облака
+    ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, W, hy + 1);
+    ctx.globalAlpha = 0.9;
+    ctx.drawImage(glowSun, W * 0.55, -W * 0.3, W * 0.8, W * 0.8);
+    ctx.globalAlpha = 1;
+    for (i = 0; i < clouds.length; i++) {
+      var cl = clouds[i], cw = 150 * cl.k, chh = 60 * cl.k;
+      var cx = ((cl.x + (REDUCED ? 0 : tAnim * cl.v)) % (W + cw * 2)) - cw;
+      ctx.drawImage(cloudImg, cx, cl.y, cw, chh);
+    }
+    // городок с параллаксом (реагирует на положение героя)
+    var off = REDUCED ? 0 : (player.x - W / 2);
+    var fw = W * 1.3, farH = hy * 0.42, nearH = hy * 0.36;
+    // Keep the vanishing point clear: no background tree or house blocks the street.
+    var horizonLeft = sxAt(roadLeft, RT) - 9, horizonRight = sxAt(roadRight, RT) + 9;
+    ctx.save(); ctx.beginPath();
+    ctx.rect(0, 0, horizonLeft, hy + 4); ctx.rect(horizonRight, 0, W - horizonRight, hy + 4); ctx.clip();
+    ctx.drawImage(townFar, -W * 0.15 - off * 0.05, hy - farH + 2, fw, farH);
+    ctx.drawImage(townNear, -W * 0.15 - off * 0.12, hy - nearH + 3, fw, nearH);
+    ctx.restore();
+
+    // земля + дорога
+    ctx.fillStyle = groundGrad; ctx.fillRect(0, hy, W, H - hy);
+    var tl = sxAt(roadLeft, RT), tr = sxAt(roadRight, RT), bl = sxAt(roadLeft, rB), br = sxAt(roadRight, rB);
+    // Тротуары отделяют дорогу от домов; камера смотрит вдоль улицы с меньшей высоты.
+    for (var side = -1; side <= 1; side += 2) {
+      var edge = side < 0 ? roadLeft : roadRight, outer = edge + side * W * .22;
+      ctx.fillStyle = "#d4ddf2"; ctx.beginPath();
+      ctx.moveTo(sxAt(edge,RT),hy); ctx.lineTo(sxAt(outer,RT),hy); ctx.lineTo(sxAt(outer,rB),H); ctx.lineTo(sxAt(edge,rB),H); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle="#a4b4d866"; ctx.lineWidth=2;
+      for(var tile=0;tile<15;tile++){
+        var depth=(tile+(u*6)%1)/12, sc=rOf(depth), yy=yOf(sc);if(yy>H)break;
+        ctx.beginPath();ctx.moveTo(sxAt(edge,sc),yy);ctx.lineTo(sxAt(outer,sc),yy);ctx.stroke();
+      }
+    }
+    ctx.fillStyle = roadGrad;
+    ctx.beginPath(); ctx.moveTo(tl, hy); ctx.lineTo(tr, hy); ctx.lineTo(br, H); ctx.lineTo(bl, H); ctx.closePath(); ctx.fill();
+
+    ctx.save(); ctx.clip();
+    // полосы-«шпалы» в перспективе — главный источник ощущения скорости
+    N = 8; ph = (u * N) % 1; fl = Math.floor(u * N);
+    ctx.fillStyle = "rgba(115,80,255,0.045)";
+    for (i = 0; i <= N; i++) {
+      if (((i - fl) & 1) === 0) continue;
+      var pa = clamp((i - 1 + ph) / N, 0, 1.3), pb = clamp((i + ph) / N, 0, 1.3);
+      var ya = yOf(rOf(pa)), yb = yOf(rOf(pb));
+      if (yb > ya && ya < H) ctx.fillRect(0, ya, W, Math.min(yb, H) - ya + 1);
+    }
+
+    // дорожки: подсветка цветом действия (активная ярче) + вспышки
+    for (i = 0; i < LANES; i++) {
+      var active = i === player.lane && state === "run";
+      var choosing = state === "run" && phase !== "road";
+      var a = choosing ? (active ? 0.17 : 0.06) : (active ? 0.06 : 0.015);
+      if (laneFlash[i] > 0) a += laneFlash[i] * 0.5;
+      if (laneHint[i] > 0) a += (0.18 + 0.18 * Math.sin(tAnim * 18)) * Math.min(1, laneHint[i]);
+      var x0 = roadLeft + laneWidth * i, x1 = x0 + laneWidth;
+      ctx.fillStyle = "rgba(" + (choosing ? LANE_RGB[i] : "115,80,255") + "," + a + ")";
+      ctx.beginPath();
+      ctx.moveTo(sxAt(x0, RT) + 2, hy); ctx.lineTo(sxAt(x1, RT) - 2, hy);
+      ctx.lineTo(sxAt(x1, rB) - 2, H); ctx.lineTo(sxAt(x0, rB) + 2, H); ctx.closePath(); ctx.fill();
+    }
+
+    // неоновые края дороги (золотые при серии)
+    var edgeCol = feverGlow > 0.02 ? "rgba(255,194,75," + (0.55 + feverGlow * 0.4) + ")" : "rgba(255,255,255,.95)";
+    ctx.strokeStyle = edgeCol; ctx.lineWidth = 3 + feverGlow * 2;
+    ctx.beginPath(); ctx.moveTo(tl, hy); ctx.lineTo(bl, H); ctx.moveTo(tr, hy); ctx.lineTo(br, H); ctx.stroke();
+    if (feverGlow > 0.05) {
+      ctx.strokeStyle = "rgba(255,194,75," + feverGlow * 0.16 + ")"; ctx.lineWidth = 12;
+      ctx.beginPath(); ctx.moveTo(tl, hy); ctx.lineTo(bl, H); ctx.moveTo(tr, hy); ctx.lineTo(br, H); ctx.stroke();
+    }
+
+    // разделители-пунктир: трапеции, сходящиеся к горизонту
+    N = 9; ph = (u * N) % 1;
+    ctx.fillStyle = "rgba(115,80,255,0.28)";
+    ctx.beginPath();
+    for (i = 0; i <= N + 3; i++) {
+      var pd = (i - 1 + ph) / N, pe = pd + 0.5 / N;
+      if (pe <= 0) continue; if (pd >= 1.3) break;
+      pd = Math.max(0, pd); pe = Math.min(1.3, pe);
+      var ra = rOf(pd), rb = rOf(pe), ya2 = yOf(ra), yb2 = yOf(rb);
+      if (ya2 >= H) break;
+      for (j = 1; j < LANES; j++) {
+        var xb = roadLeft + laneWidth * j, wa = 1.6 * ra, wb = 1.6 * rb;
+        ctx.moveTo(sxAt(xb, ra) - wa, ya2); ctx.lineTo(sxAt(xb, ra) + wa, ya2);
+        ctx.lineTo(sxAt(xb, rb) + wb, yb2); ctx.lineTo(sxAt(xb, rb) - wb, yb2); ctx.closePath();
+      }
+    }
+    ctx.fill();
+
+    // линия решения — «сканер» на уровне героя
+    ctx.fillStyle = "rgba(255,255,255," + (0.07 + 0.05 * Math.sin(tAnim * 5)) + ")";
+    if (phase !== "road") ctx.fillRect(roadLeft, pY + 31, roadWidth, 3);
+    ctx.restore();
+
+    // Две линии бордюра и фонари подчёркивают глубину улицы.
+    for (var curb = -1; curb <= 1; curb += 2) {
+      var rx = W / 2 + curb * (roadWidth / 2 + 7);
+      ctx.strokeStyle = "#ffffffcc"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sxAt(rx,RT),hy); ctx.lineTo(sxAt(rx,rB),H); ctx.stroke();
+    }
+
+    // скоростные линии, разлетающиеся от горизонта
+    if (state === "run" && !REDUCED) {
+      var spd = clamp((speed / (diff.runSpeedMultiplier || 1.5) - diff.startSpeed) / (diff.maxSpeed - diff.startSpeed), 0, 1);
+      ctx.strokeStyle = "rgba(255,255,255," + (0.04 + spd * 0.09) + ")";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      var cnt = 9 + Math.round(spd * 3), L = H * 1.1, vy = hy - 4;
+      for (i = 0; i < cnt; i++) {
+        var t = (i * 0.0833 + u * 2.4) % 1, d1 = t * t * L, d2 = d1 + 10 + t * (50 + spd * 80);
+        var ca = Math.cos(streakAng[i]), sa2 = Math.sin(streakAng[i]);
+        ctx.moveTo(W / 2 + ca * d1 * 1.2, vy + sa2 * d1); ctx.lineTo(W / 2 + ca * d2 * 1.2, vy + sa2 * d2);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawRoadObjects(foreground) {
+    for (var i = 0; i < roadObjects.length; i++) {
+      var o = roadObjects[i];
+      if (o.p < 0 || (o.p > 1.012) !== foreground) continue;
+      if (o.type === "coin") drawCoin(o); else drawObstacle(o);
+    }
+  }
+  function coinPosition(c) {
+    var r = rOf(c.p), x = sxAt(laneX(c.lane), r);
+    return { x: x, y: yOf(r) + (36 - c.height) * r, ground: yOf(r) + 36 * r, scale: r * (c.value === 5 ? 1.75 : 1.2) };
+  }
+  function drawCoin(c) {
+    var pos = coinPosition(c);
+    if (pos.y > H + 60) return;
+    ctx.save();
+    ctx.fillStyle="rgba(0,10,18,.18)";ctx.beginPath();ctx.ellipse(pos.x,pos.ground,15*pos.scale,4*pos.scale,0,0,Math.PI*2);ctx.fill();
+    ctx.translate(pos.x,pos.y);ctx.scale(pos.scale,pos.scale);
+    ctx.globalAlpha=.35;ctx.drawImage(glowGold,-29,-29,58,58);ctx.globalAlpha=1;
+    var turn = REDUCED ? 1 : c.value === 5 ? .96 + .04 * Math.sin(tAnim * 3) : .72 + .28 * Math.sin(tAnim * 3 + c.id * .4);
+    drawCoinFace(turn, c.value);ctx.restore();
+  }
+  function drawCoinFace(turn, value) {
+    ctx.save(); ctx.scale(turn,1);
+    ctx.fillStyle="#b07d28";ctx.beginPath();ctx.ellipse(3,0,15,19,0,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#ffc64b";ctx.beginPath();ctx.ellipse(0,0,15,19,0,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="#fff1a3";ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,12,16,0,0,Math.PI*2);ctx.stroke();
+    if (value === 5) {
+      ctx.fillStyle="#855015";ctx.font="900 13px " + FONT;ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.fillText("X5",0,1);
+    } else {
+      ctx.fillStyle="#ba8124";ctx.beginPath();
+      for(var i=0;i<10;i++){var a=-Math.PI/2+i*Math.PI/5,sz=i%2?4:9;var px=Math.cos(a)*sz,py=Math.sin(a)*sz*1.18;if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);}
+      ctx.closePath();ctx.fill();
+    }
+    ctx.restore();
+  }
+  function drawObstacle(o) {
+      var r = rOf(o.p), x = sxAt(laneX(o.lane), r), y = yOf(r) + 36 * r;
+      var w = laneWidth * .58;
+      ctx.save(); ctx.translate(x, y); ctx.scale(r, r);
+      if (o.hit) ctx.globalAlpha = .42;
+      ctx.fillStyle = "rgba(71,50,128,.18)";
+      ctx.beginPath(); ctx.ellipse(0, 3, w * .66, 9, 0, 0, Math.PI * 2); ctx.fill();
+      if (o.type === "barrier") {
+        // Низкая перекладина: золотая верхняя грань, диагональные сигнальные полосы.
+        ctx.fillStyle = "#8d81bd";
+        roundRect(-w / 2 + 4, -38, 8, 38, 3); ctx.fill();
+        roundRect(w / 2 - 12, -38, 8, 38, 3); ctx.fill();
+        ctx.fillStyle = "#ffd23f"; roundRect(-w / 2, -47, w, 25, 4); ctx.fill();
+        ctx.save(); roundRect(-w / 2, -47, w, 25, 4); ctx.clip();
+        ctx.strokeStyle = "#b38332"; ctx.lineWidth = 9;
+        for (var j = -w; j < w; j += 24) { ctx.beginPath(); ctx.moveTo(j, -22); ctx.lineTo(j + 20, -47); ctx.stroke(); }
+        ctx.restore();
+        ctx.strokeStyle = "#ffe2a2"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-w / 2 + 4, -46); ctx.lineTo(w / 2 - 4, -46); ctx.stroke();
+        // Рисованная стрелка вверх обозначает доступный прыжок.
+        ctx.fillStyle = "#7350ff"; roundRect(-13, -43, 26, 19, 5); ctx.fill();
+        ctx.strokeStyle = "#ffe4a1"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(0,-28); ctx.lineTo(0,-39); ctx.moveTo(-5,-34); ctx.lineTo(0,-39); ctx.lineTo(5,-34); ctx.stroke();
+      } else {
+        // Два высоких грузовых ящика: их высота явно больше высоты прыжка.
+        var bw = w * .88;
+        ctx.fillStyle = "#aa91e6"; roundRect(-bw / 2, -132, bw, 132, 5); ctx.fill();
+        ctx.fillStyle = "#dbc9ff";
+        ctx.beginPath(); ctx.moveTo(-bw / 2,-132); ctx.lineTo(-bw / 2 + 10,-141); ctx.lineTo(bw / 2 + 10,-141); ctx.lineTo(bw / 2,-132); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = "#8161bd";
+        ctx.beginPath(); ctx.moveTo(bw / 2,-132); ctx.lineTo(bw / 2+10,-141); ctx.lineTo(bw / 2+10,-10); ctx.lineTo(bw / 2,0); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = "#eee6ff"; ctx.lineWidth = 3;
+        for (var k = 0; k < 2; k++) {
+          var top = -128 + k * 66;
+          ctx.strokeRect(-bw / 2 + 5,top,bw - 10,57);
+          ctx.beginPath(); ctx.moveTo(-bw / 2 + 7,top + 4); ctx.lineTo(bw / 2 - 7,top + 53); ctx.moveTo(bw / 2 - 7,top + 4); ctx.lineTo(-bw / 2 + 7,top + 53); ctx.stroke();
+        }
+        ctx.fillStyle = "#f2c66a"; roundRect(-19,-86,38,24,5); ctx.fill();
+        ctx.strokeStyle = "#593a97"; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(-12,-74); ctx.lineTo(12,-74); ctx.moveTo(-7,-79); ctx.lineTo(-12,-74); ctx.lineTo(-7,-69); ctx.moveTo(7,-79); ctx.lineTo(12,-74); ctx.lineTo(7,-69); ctx.stroke();
+      }
+      ctx.restore();
+  }
+
+  // На дороге движется компактный маркер события; вся реплика видна в предметной сцене.
+  function drawCard(c) {
+    var p = clamp((c.y + cardH()) / pY, 0, 1), r = rOf(p);
+    var sx = sxAt(c.x, r), sy = yOf(r) - 24;
+    var scale = 0.65 + p * 0.35;
+    var alpha = clamp(c.age / 0.22, 0, 1);
+    if (c.resolved) { alpha *= c.removeTimer / 0.5; scale *= 1 + (0.5 - c.removeTimer) * 0.45; }
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.translate(sx, sy); ctx.scale(scale, scale);
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.beginPath(); ctx.ellipse(0, 30, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = c.resolved ? (c.result === "ok" ? "#d9f8e2" : "#fff0ce") : "#ffffff";
+    roundRect(-25, -25, 50, 50, 15); ctx.fill();
+    ctx.strokeStyle = "#b5a2f0"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#223c56"; ctx.font = "25px " + FONT;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(c.resolved ? (c.result === "ok" ? "✓" : "!") : (EVENT_SYMBOLS[(c.visual || {}).type] || c.icon), 0, 1);
+    ctx.restore();
+  }
+
+  function shieldPath() {
+    ctx.beginPath();
+    ctx.moveTo(-22, -18);
+    ctx.quadraticCurveTo(0, -31, 22, -18);
+    ctx.lineTo(22, 4);
+    ctx.quadraticCurveTo(20, 20, 0, 29);
+    ctx.quadraticCurveTo(-20, 20, -22, 4);
+    ctx.closePath();
+  }
+
+  function drawPlayer() {
+    if (state !== "run" && state !== "start") return;
+    var trip = 0, tripLean = 0, tripDip = 0;
+    if (stumbleT > 0) {
+      var st = 1 - stumbleT / STUMBLE_TIME, k;
+      // Catch a foot, tip forward, overcorrect, then settle back into the run.
+      if (st < .18) { k = st / .18; tripLean = lerp(0, .64, k*k*(3-2*k)); }
+      else if (st < .52) { k = (st-.18)/.34; tripLean = lerp(.64, -.2, k*k*(3-2*k)); }
+      else { k = (st-.52)/.48; tripLean = lerp(-.2, 0, k*k*(3-2*k)); }
+      tripLean *= stumbleDir;
+      trip = Math.min(1, st / .12) * (1 - clamp((st - .4) / .6, 0, 1));
+      tripDip = Math.sin(Math.PI * Math.min(1, st / .72)) * 13;
+    }
+    var x = player.x;
+    var bounce = -Math.abs(Math.sin(player.bob)) * 3.5 * (1 - trip);
+    var hop = hopT > 0 ? -Math.sin(Math.PI * (1 - hopT / 0.36)) * 20 : 0;
+    var y = (state === "start" ? H*.52 : playerY()) + bounce + hop - course.jumpHeight + tripDip;
+    var sq = squashT > 0 ? squashT / 0.22 : 0;
+    var dx = player.targetX - player.x;
+    var lean = clamp(dx / 70, -0.38, 0.38);
+    var sx = 1 + sq * 0.2 + Math.abs(lean) * 0.1, sy = 1 - sq * 0.18;
+    if (hopT > 0) { sy += 0.12 * Math.sin(Math.PI * (1 - hopT / 0.36)); sx -= 0.06; }
+    var wob = tripLean;
+    sx += trip * .08; sy -= trip * .14;
+    var air = Math.max(hop < -2 ? clamp(-hop / 20, 0, 1) : 0, course.jumpHeight / window.RunnerCourse.jumpHeight);
+
+    // кольцо под ногами цвета текущей дорожки + тень
+    var gy = (state === "start" ? H*.52 : playerY()) + 36;
+    ctx.fillStyle = "rgba(" + (phase === "road" ? "0,193,160" : LANE_RGB[player.lane]) + "," + (0.28 + 0.1 * Math.sin(tAnim * 6)) + ")";
+    ctx.beginPath(); ctx.ellipse(x, gy, 34 - air * 8, 11 - air * 3, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = "rgba(0,0,0," + (0.35 - air * 0.15) + ")";
+    ctx.beginPath(); ctx.ellipse(x, gy, 22 - air * 6 + sq * 4, 7 - air * 2, 0, 0, 6.2832); ctx.fill();
+
+    // шлейф-призраки при смене дорожки
+    var moving = Math.abs(dx) > 8;
+    if (moving && !REDUCED) {
+      for (var gI = 0; gI < 3; gI++) {
+        ctx.save(); ctx.translate(ghostX[gI], y); ctx.globalAlpha = 0.22 - gI * 0.06; shieldPath();
+        ctx.fillStyle = "#00c1a0"; ctx.fill(); ctx.restore();
+      }
+    }
+    ghostX[2] = ghostX[1]; ghostX[1] = ghostX[0]; ghostX[0] = x;
+
+    // аура
+    ctx.globalAlpha = 0.18 + 0.4 * feverGlow;
+    var ag = 58 + feverGlow * 10;
+    ctx.drawImage(feverGlow > 0.5 ? glowGold : glowGreen, x - ag, y - ag, ag * 2, ag * 2);
+    ctx.globalAlpha = 1;
+
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(lean + wob); ctx.scale(sx, sy);
+    var sw = Math.sin(player.bob) * (1 - trip);
+    // ноги
+    ctx.lineCap = "round";
+    for (var lg = -1; lg <= 1; lg += 2) {
+      var ph2 = lg === -1 ? sw : -sw, ly = 31 + ph2 * 4.5 - air * 4 - (lg === stumbleDir ? 9 : -3) * trip;
+      var footX = lg * 10.5 + stumbleDir * (lg === stumbleDir ? 13 : -10) * trip;
+      ctx.strokeStyle = "#23246a"; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(lg * 9, 22); ctx.lineTo(lg * 9 + stumbleDir * 7 * trip, 27); ctx.lineTo(footX, ly); ctx.stroke();
+      ctx.fillStyle = "#ffc24b";
+      ctx.beginPath(); ctx.ellipse(footX, ly + 3, 7.5, 4.6, -tripLean * .4, 0, 6.2832); ctx.fill();
+    }
+    // шарф сзади (машет вниз)
+    var wave = Math.sin(player.bob * 1.3);
+    ctx.fillStyle = "#ffc24b";
+    for (var sd = -1; sd <= 1; sd += 2) {
+      ctx.beginPath();
+      ctx.moveTo(sd * 19, -12);
+      ctx.quadraticCurveTo(sd * (30 + wave * 3), 4, sd * (27 + wave * 5), 20 + wave * 2);
+      ctx.quadraticCurveTo(sd * 20, 8, sd * 15, 4);
+      ctx.closePath(); ctx.fill();
+    }
+    // руки (взмах в противофазе с ногами)
+    ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4;
+    for (var arm = -1; arm <= 1; arm += 2) {
+      var handX = arm * (26 + trip * 9), handY = 4 - arm * sw * 5 - air * 8 - trip * (arm === stumbleDir ? 32 : 20);
+      ctx.beginPath(); ctx.moveTo(arm * 18, 0); ctx.lineTo(arm * (25 + trip * 6), handY + trip * 7); ctx.lineTo(handX, handY); ctx.stroke();
+      ctx.beginPath(); ctx.arc(handX, handY, 5, 0, 6.2832); ctx.fill();
+    }
+
+    // тело-щит: фирменный зелёный градиент
+    var gr = ctx.createLinearGradient(-22, -28, 22, 28);
+    gr.addColorStop(0, "#2bbf4a"); gr.addColorStop(0.55, "#21a038"); gr.addColorStop(1, "#00b49a");
+    shieldPath(); ctx.lineWidth = 7; ctx.strokeStyle = "#23246a"; ctx.lineJoin = "round"; ctx.stroke(); ctx.fillStyle = gr; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = "#eafff0"; ctx.stroke();
+    // блик
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.beginPath(); ctx.ellipse(-9, -16, 8, 4, -0.5, 0, 6.2832); ctx.fill();
+
+    // глаза (моргают), смотрят вперёд и в сторону движения
+    var blink = (tAnim % 3.2) < 0.12 ? 0.15 : 1;
+    var lx = clamp(dx / 40, -1, 1) * 1.6;
+    for (var e = -1; e <= 1; e += 2) {
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.ellipse(e * 8, -10, 5.4, 6 * blink, 0, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = "#0e1a12";
+      if (hurtT > 0) { ctx.fillRect(e * 8 - 3, -11, 6, 2); }
+      else { ctx.beginPath(); ctx.arc(e * 8 + lx, -12 + (blink < 1 ? 2 : 0), 2.7, 0, 6.2832); ctx.fill(); }
+    }
+    // рот
+    ctx.strokeStyle = "#0e1a12"; ctx.lineWidth = 2;
+    ctx.beginPath();
+    if (hurtT > 0) ctx.arc(0, 2, 3, Math.PI, 0); else ctx.arc(0, -1, 4.5, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+    // эмблема-галочка
+    ctx.fillStyle = "rgba(255,255,255,0.95)";
+    ctx.beginPath(); ctx.arc(0, 14, 7.5, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = "#21a038"; ctx.lineWidth = 2.6; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(-3.5, 14); ctx.lineTo(-0.8, 17); ctx.lineTo(4, 11); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ---------- Canvas-помощники ----------
+  function roundRect(x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // ---------- Главный цикл ----------
+  var last = 0;
+  function frame(ts) {
+    var realDt = last ? Math.max(0, (ts - last) / 1000) : 0;
+    last = ts;
+    // Физика ограничивает шаг; таймер решения использует реальное активное время.
+    if (!document.hidden && !paused) { update(Math.min(0.05, realDt), realDt); draw(); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Кнопки / UI ----------
+  function setupUI() {
+    $("btn-play").addEventListener("click", openTutorial);
+    $("btn-tutorial-close").addEventListener("click", finishTutorial);
+    $("btn-tutorial-start").addEventListener("click", finishTutorial);
+    $("tutorial-overlay").addEventListener("keydown", function (event) {
+      if (event.key !== "Tab") return;
+      var first = $("btn-tutorial-close"), lastButton = $("btn-tutorial-start");
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); lastButton.focus(); }
+      else if (!event.shiftKey && document.activeElement === lastButton) { event.preventDefault(); first.focus(); }
+    });
+    $("btn-again").addEventListener("click", function () { startRun(); });
+    $("btn-pause").addEventListener("click", function () { setPaused(true); });
+    $("btn-resume").addEventListener("click", function () { setPaused(false, true); });
+    $("btn-finish-run").addEventListener("click", endRun);
+    $("btn-exit").addEventListener("click", exitGame);
+    $("pause-overlay").addEventListener("keydown", function (event) {
+      if (event.key !== "Tab") return;
+      var first = $("btn-resume"), lastButton = $("btn-exit");
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); lastButton.focus(); }
+      else if (!event.shiftKey && document.activeElement === lastButton) { event.preventDefault(); first.focus(); }
+    });
+    document.addEventListener("visibilitychange", function () { if (document.hidden && state === "run" && !paused) setPaused(true); });
+    window.addEventListener("pagehide", function () { if (state === "run" && !paused) setPaused(true); });
+
+    var tgl = $("sound-toggle");
+    tgl.addEventListener("change", function () { Sound.on = tgl.checked; Sound.ensure(); syncSoundBtn(); });
+    $("sound-run").addEventListener("click", function () { Sound.on = !Sound.on; tgl.checked = Sound.on; Sound.ensure(); syncSoundBtn(); });
+    syncSoundBtn();
+  }
+  function syncSoundBtn() {
+    $("sound-run").innerHTML = '<svg viewBox="0 0 28 26" aria-hidden="true"><rect x="2" y="9" width="5" height="9" rx="1.8"/><path d="M9 8L17 2.5Q18 2 18 3.5V23Q18 24 17 23.5L9 18Z"/>' +
+      (Sound.on ? '<path d="M21 9q4 4.5 0 9M24 5q7 8.5 0 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' : '<path d="M21 10l5 7m0-7l-5 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>') + '</svg>';
+    $("sound-run").setAttribute("aria-label", Sound.on ? "Выключить звук" : "Включить звук");
+    $("sound-run").setAttribute("aria-pressed", String(Sound.on));
+  }
+
+  // ---------- Инициализация ----------
+  window.addEventListener("resize", resize);
+  // Пересобирать раскладку, когда контейнер получает реальный размер (скрытая вкладка/превью → видимый).
+  try {
+    if (window.ResizeObserver) { new ResizeObserver(function () { resize(); }).observe($("app")); }
+  } catch (e) {}
+  try { resize(); } catch (e) { /* не даём краху раскладки оборвать инициализацию */ }
+  setupInput();
+  setupUI();
+  if (loadContent()) requestAnimationFrame(frame);
+})();
+
+</script>
+</body>
+</html>

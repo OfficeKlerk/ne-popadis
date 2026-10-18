@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <link rel="icon" href="data:," />
   <title>Не попадись!</title>
-  <link rel="stylesheet" href="styles.css?v=reel-jump-3" />
-  <link rel="stylesheet" href="events.css?v=reel-jump-3" />
-  <link rel="stylesheet" href="rewards.css?v=reel-jump-3" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="events.css" />
+  <link rel="stylesheet" href="rewards.css" />
 </head>
 <body>
   <div id="app">
     <!-- Игровое поле -->
-    <canvas id="game" aria-label="Бег по трём дорожкам. Стрелки влево и вправо — манёвр, вверх или пробел — прыжок."></canvas>
+    <canvas id="game" tabindex="-1" aria-label="Бег по трём дорожкам. Стрелки влево и вправо — манёвр, вверх или пробел — прыжок."></canvas>
     <section id="event-stage" class="event-stage hidden" role="status" aria-live="polite" aria-atomic="true"></section>
 
     <!-- HUD во время забега -->
@@ -46,7 +46,6 @@
       </div>
       <div class="start-stage" aria-hidden="true"></div>
       <div class="start-bottom">
-        <p class="start-help">Собирай монеты, обходи ящики,<br>прыгай через барьеры и выбирай безопасный ответ.<br>Свайп вбок — манёвр, вверх — прыжок.</p>
         <button class="btn-primary" id="btn-play">Играть</button>
         <label class="sound-toggle">
           <input type="checkbox" id="sound-toggle" />
@@ -56,8 +55,59 @@
       </div>
     </section>
 
+    <section id="tutorial-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" aria-describedby="tutorial-subtitle">
+      <div class="tutorial-card">
+        <button id="btn-tutorial-close" class="tutorial-close" aria-label="Пропустить обучение и начать игру"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+        <h2 id="tutorial-title">Как играть</h2>
+        <p id="tutorial-subtitle">Герой бежит сам</p>
+        <div class="tutorial-moves">
+          <div class="tutorial-step">
+            <svg class="tutorial-art" viewBox="0 0 140 116" aria-hidden="true">
+              <defs><g id="tutorial-hero"><ellipse cy="24" rx="18" ry="5" fill="#c2b7eb"/><path d="M0-24L19-17V1Q18 17 0 24Q-18 17-19 1V-17Z" fill="#22c37a" stroke="#fff" stroke-width="3"/><ellipse cx="-7" cy="-6" rx="4" ry="6" fill="#fff"/><ellipse cx="7" cy="-6" rx="4" ry="6" fill="#fff"/><circle cx="-6" cy="-5" r="2" fill="#23246a"/><circle cx="8" cy="-5" r="2" fill="#23246a"/><path d="M-5 6q5 6 10 0" fill="none" stroke="#23246a" stroke-width="2.5" stroke-linecap="round"/></g></defs>
+              <path d="M17 108L36 10H104L123 108" fill="#e2daf7"/><path d="M51 12L44 108M89 12L96 108" stroke="#fff" stroke-width="2" stroke-dasharray="6 6"/>
+              <g fill="#a28bd4" stroke="#fff" stroke-width="2"><rect x="53" y="18" width="34" height="38" rx="4"/><path d="M58 23l24 28m0-28L58 51"/></g>
+              <g class="tutorial-dodge"><use href="#tutorial-hero" x="70" y="75"/></g>
+              <path d="M33 105H107m-68-6l-6 6 6 6m62-12l6 6-6 6" fill="none" stroke="#7350ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <strong>Обходи ящики</strong><span>Свайп ← →</span>
+          </div>
+          <div class="tutorial-step">
+            <svg class="tutorial-art" viewBox="0 0 140 116" aria-hidden="true">
+              <path d="M17 108L36 10H104L123 108" fill="#fff0bf"/><path d="M51 12L44 108M89 12L96 108" stroke="#fff" stroke-width="2" stroke-dasharray="6 6"/>
+              <ellipse cx="70" cy="23" rx="14" ry="17" fill="#ffd23f" stroke="#fff5be" stroke-width="3"/><text x="70" y="28" text-anchor="middle" fill="#855015" font-size="13" font-weight="900">X5</text>
+              <path d="M47 83v23m46-23v23" stroke="#9987bc" stroke-width="7"/><rect x="41" y="73" width="58" height="17" rx="4" fill="#ffd23f"/><path d="M48 88l10-13m8 13l10-13m8 13l10-13" stroke="#c28b31" stroke-width="4"/>
+              <g class="tutorial-jump"><use href="#tutorial-hero" x="70" y="62"/></g>
+              <path d="M118 84V53m-6 6l6-6 6 6" fill="none" stroke="#7350ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <strong>Прыгай за монетами</strong><span>Свайп ↑</span>
+          </div>
+        </div>
+        <div class="tutorial-answer">
+          <strong>Выбирай безопасный ответ</strong>
+          <div class="tutorial-choices" aria-hidden="true">
+            <span><i class="tutorial-no">×</i>Отказать</span><span><i class="tutorial-check"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="M15 15l5 5"/></svg></i>Проверить</span><span><i class="tutorial-yes">✓</i>Можно</span>
+          </div>
+        </div>
+        <button id="btn-tutorial-start" class="btn-primary">Поехали!</button>
+        <p class="tutorial-keyboard">На компьютере: ← → и пробел</p>
+      </div>
+    </section>
+
     <!-- Экран итога -->
     <section id="screen-end" class="screen hidden" aria-labelledby="end-title">
+      <div id="run-complete" class="run-complete hidden" role="status" aria-live="polite">
+        <svg class="complete-art" viewBox="0 0 240 112" aria-hidden="true">
+          <ellipse cx="120" cy="55" rx="64" ry="48" fill="#ffedab"/>
+          <g fill="none" stroke-width="5" stroke-linecap="round"><path d="M43 29l-7-6m4 61l-9 4m166-60l8-5m-9 58l9 4" stroke="#a493ed"/><path d="M65 14l-2-8m112 8l3-8m-8 89l4 7m-100-7l-3 7" stroke="#efb738"/></g>
+          <g fill="#70d7aa"><circle cx="29" cy="54" r="4"/><circle cx="212" cy="52" r="4"/></g>
+          <path d="M98 70l-8 36 18-7 10 11 7-34M141 70l9 36-18-7-10 11-7-34" fill="#9980ee"/>
+          <circle cx="120" cy="51" r="42" fill="#e7ae32"/><circle cx="120" cy="48" r="41" fill="#ffd45b" stroke="#fff3c8" stroke-width="4"/>
+          <path d="M120 18l24 9v22q-1 20-24 31-23-11-24-31V27Z" fill="#22bc7b" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
+          <path d="M108 48l9 9 17-20" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h2 id="complete-title">Поздравляем!</h2>
+        <p>Ты добежал до конца и ни разу не попался на ловушку!</p>
+      </div>
       <h2 class="end-title" id="end-title">Забег окончен!</h2>
       <div class="end-stats">
         <div class="stat"><div class="stat-num" id="end-distance">0</div><div class="stat-lbl">метров</div></div>
@@ -67,10 +117,9 @@
       <p class="end-verdict" id="end-verdict"></p>
       <div class="end-review" id="end-review"></div>
       <section class="chest-shop" aria-labelledby="shop-title">
-        <div class="shop-heading"><h3 id="shop-title">Выбери сундук</h3><span class="shop-wallet"><i class="coin-dot" aria-hidden="true"></i><span id="shop-balance" aria-live="polite">0</span><span class="sr-only">монет осталось</span></span></div>
+        <div class="shop-heading"><h3 id="shop-title">Выбери друга за монеты</h3><span class="shop-wallet"><i class="coin-dot" aria-hidden="true"></i><span id="shop-balance" aria-live="polite">0</span><span class="sr-only">монет осталось</span></span></div>
         <div class="chest-list" id="chest-list"></div>
         <div id="run-collection" class="run-collection hidden"><h4 id="collection-heading">Зверушки забега</h4><div id="run-pets" class="run-pets"></div></div>
-        <p class="shop-note">Монеты и зверушки — до нового забега.</p>
       </section>
       <button class="btn-primary" id="btn-again">Начать заново</button>
     </section>
@@ -94,11 +143,13 @@
     </section>
   </div>
 
-  <script src="js/events.js?v=reel-jump-3"></script>
-  <script src="js/runner.js?v=reel-jump-3"></script>
-  <script src="js/city.js?v=reel-jump-3"></script>
-  <script src="js/rewards.js?v=reel-jump-3"></script>
-  <script src="js/reward-shop.js?v=reel-jump-3"></script>
-  <script src="js/game.js?v=reel-jump-3"></script>
+  <script src="js/content.js"></script>
+  <script src="js/platform.js"></script>
+  <script src="js/events.js"></script>
+  <script src="js/runner.js"></script>
+  <script src="js/city.js"></script>
+  <script src="js/rewards.js"></script>
+  <script src="js/reward-shop.js"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>

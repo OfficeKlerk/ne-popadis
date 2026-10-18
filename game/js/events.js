@@ -3,6 +3,7 @@
   "use strict";
   var icons = {
     person: '<circle cx="12" cy="8" r="3.5"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
+    price: '<path d="M3 3h8l10 10-8 8L3 11z"/><circle cx="7.5" cy="7.5" r="1.5"/><path d="m11 11 5 5M14 10l3 3"/>',
     phone: '<path d="M5 3l4 4-2 3a16 16 0 0 0 7 7l3-2 4 4-2 3C10 22 2 14 2 5z"/>',
     message: '<path d="M21 11a9 9 0 0 1-9 9H3l2-5a9 9 0 1 1 16-4z"/><path d="M8 9h8M8 13h5"/>',
     lock: '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/>',
@@ -20,6 +21,7 @@
   };
   var types = {
     call: { label: "Звонок", icon: "phone", motion: "Телефон покачивается, вокруг собеседника расходятся кольца." },
+    purchase: { label: "Покупка", icon: "price", motion: "Ценник мягко покачивается над пакетиком покупки." },
     chat: { label: "Переписка", icon: "message", motion: "Появляется индикатор набора, затем выдвигается сообщение." },
     account: { label: "Аккаунт", icon: "lock", motion: "Открывается маленький ноутбук, последовательно появляются точки пароля." },
     card: { label: "Фото карты", icon: "card", motion: "Карта разворачивается в рамке камеры, по ней проходит свет." },
@@ -36,7 +38,9 @@
   function escape(s) { return String(s || "").replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function scene(s, type) {
     var v = s.visual || {}, art = "", label = types[type].label;
-    if (type === "call") {
+    if (type === "purchase") {
+      art = '<span class="ev-shopping-bag"><i></i></span><span class="ev-price-tag">' + icon("price") + '</span>';
+    } else if (type === "call") {
       label = "Входящий звонок";
       art = '<div class="ev-phone"><i class="ev-speaker"></i><span class="ev-avatar">' + icon("person") + '</span><span class="ev-receiver">' + icon("phone") + '</span></div><i class="ev-ring r1"></i><i class="ev-ring r2"></i>';
     } else if (type === "chat") {
@@ -60,6 +64,7 @@
       label = "На твоём пути";
       art = '<span class="ev-big-coin">' + icon("coin") + '</span><i class="ev-coin-shadow"></i>';
     }
+    label = v.label || label;
     var sender = v.sender || (type === "browser" ? v.address : "");
     return '<div class="ev-scene"><div class="ev-art" aria-hidden="true">' + art + '</div><div class="ev-copy"><div class="ev-eyebrow">' + escape(label) + '</div>' +
       (sender ? '<div class="ev-sender">' + escape(sender) + '</div>' : '') + '<p class="ev-words">' + escape(s.text) + '</p></div></div>';

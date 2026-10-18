@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
   <title>События · Не попадись!</title>
-  <link rel="stylesheet" href="events.css?v=matvey-local-2">
+  <link rel="stylesheet" href="events.css">
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; background: #e5f1ff; color: #25204f; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -23,7 +23,7 @@
     .cards button { border: 1px solid #d1c9ef; background: #ffffff; border-radius: 12px; padding: 13px 14px; text-align: left; font-size: 14px; line-height: 1.4; }
     .cards button[aria-pressed="true"] { border-color: #9579f6; background: #ede6ff; }
     .cards small { display: block; margin-bottom: 3px; color: #5b5782; font-size: 11px; }
-    .preview { position: relative; min-height: 200px; border: 1px solid #c6d7ef; border-radius: 26px; overflow: hidden; background: radial-gradient(ellipse at 50% 65%,#c6e5ff,transparent 65%),linear-gradient(#a9d5ff,#edf6ff); }
+    .preview { position: relative; min-height: 330px; border: 1px solid #c6d7ef; border-radius: 26px; overflow: hidden; background: radial-gradient(ellipse at 50% 65%,#c6e5ff,transparent 65%),linear-gradient(#a9d5ff,#edf6ff); }
     .preview::after { content: ""; position: absolute; height: 65px; bottom: 0; left: 0; right: 0; background: repeating-linear-gradient(90deg,transparent 0 36px,#c4d7e518 36px 38px); transform: perspective(100px) rotateX(25deg); }
     .event-preview { top: 24px; }
     .event-preview .ev-timing { display: none; }
@@ -38,7 +38,7 @@
 </head>
 <body>
   <main>
-    <header><div><h1>События «Не попадись!»</h1><p>19 ситуаций · монеты на дороге</p></div><a href="index.html">К игре →</a></header>
+    <header><div><h1>События «Не попадись!»</h1><p id="catalog-count"></p></div><a href="index.html">К игре →</a></header>
     <div class="layout">
       <section aria-label="Выбор события"><nav class="group-nav" aria-label="Группы событий"></nav><div class="cards"></div></section>
       <section aria-label="Просмотр анимации">
@@ -48,6 +48,7 @@
       </section>
     </div>
   </main>
+  <script src="js/content.js"></script>
   <script src="js/events.js"></script>
   <script>
     (function () {
@@ -78,15 +79,16 @@
         });
         if (group !== "all" && content.situations[selected].visual.type !== group) show(Number(list.firstElementChild.dataset.index), true);
       }
-      fetch("content.json", { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("Контент не загружен"); return r.json(); }).then(function (data) {
-        content = data;
+      (function () {
+        content = window.GAME_CONTENT;
+        document.getElementById("catalog-count").textContent = content.situations.filter(function(s) { return s.delivery !== "pickup"; }).length + " ситуация · монеты на дороге";
         ["all"].concat(Object.keys(GameEvents.types)).forEach(function (type) {
           var button = document.createElement("button"); button.type = "button"; button.dataset.type = type;
           button.textContent = type === "all" ? "Все" : GameEvents.types[type].label;
           button.addEventListener("click", function () { filter(type); }); nav.appendChild(button);
         });
         filter("all"); show(0);
-      }).catch(function () { document.getElementById("motion").textContent = "Не удалось загрузить события. Откройте страницу через локальный сервер."; });
+      })();
       document.querySelector(".replay").addEventListener("click", function () { if (content) show(selected); });
     })();
   </script>
